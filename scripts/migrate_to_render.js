@@ -15,7 +15,8 @@ const TABLE_ORDER = [
     'users',
     'streams',
     'batches',
-    'enrollments'
+    'enrollments',
+    'site_content'
 ];
 
 async function migrateData() {

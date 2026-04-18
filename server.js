@@ -10,6 +10,8 @@ const insecureSecrets = new Set(['your-super-secret-jwt-key']);
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.CORS_ORIGINS,
+  'https://dhriticlasses.com',
+  'https://www.dhriticlasses.com',
   'http://localhost:5173',
   'http://localhost:3000'
 ]
