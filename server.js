@@ -1,4 +1,5 @@
 require('dotenv').config();
+process.env.TZ = process.env.APP_TIME_ZONE || process.env.TZ || 'Asia/Kolkata';
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');

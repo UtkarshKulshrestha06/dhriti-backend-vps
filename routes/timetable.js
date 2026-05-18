@@ -3,6 +3,14 @@ const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireTeacher } = require("../middleware/auth");
 const { cache, CACHE_TTL } = require("../services/cache");
+const {
+    formatDateString,
+    formatTimeOnlyString,
+    getTodayDateString,
+    getTomorrowDateString,
+    getDayOfWeekFromDateString,
+    toDateOnly
+} = require("../services/dateTime");
 
 const prisma = new PrismaClient();
 
@@ -37,14 +45,14 @@ function generateTemplateSlots(batchId, date, subjects) {
     ];
 
     const templates = [];
-    const dayOfWeek = new Date(date).getDay();
+    const dayOfWeek = getDayOfWeekFromDateString(date);
 
     subjects.forEach((subject, index) => {
         if (index < timeSlots.length) {
             templates.push({
                 id: `template-${date}-${index}`,
                 batchId,
-                date: new Date(date),
+                date: toDateOnly(date),
                 dayOfWeek,
                 time: `${timeSlots[index].start} - ${timeSlots[index].end}`,
                 startTime: timeSlots[index].start,
@@ -86,19 +94,14 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     try {
-        // Get today and tomorrow dates in local format mapping to standard UTC for postgres
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const todayStr = getTodayDateString();
+        const tomorrowStr = getTomorrowDateString();
 
         const data = await prisma.timetable.findMany({
             where: {
                 batch_id: targetBatchId,
                 date: {
-                    in: [
-                        new Date(today.toISOString().split("T")[0]), 
-                        new Date(tomorrow.toISOString().split("T")[0])
-                    ]
+                    in: [toDateOnly(todayStr), toDateOnly(tomorrowStr)]
                 }
             },
             orderBy: [
@@ -107,12 +110,10 @@ router.get("/", requireAuth, async (req, res) => {
             ]
         });
 
-        // Postgres Time mapping utility (converting from Date objects)
         const formatTime = (timeInfo) => {
              if (!timeInfo) return "";
-             // Sometimes prisma mapping returns Date object for Time fields depending on driver
              if (timeInfo instanceof Date) {
-                  return timeInfo.toISOString().substr(11, 5); // Returns HH:mm
+                  return formatTimeOnlyString(timeInfo);
              }
              return timeInfo.toString();
         };
@@ -120,7 +121,7 @@ router.get("/", requireAuth, async (req, res) => {
         const formatDateStr = (dateObj) => {
              if(!dateObj) return "";
              if(dateObj instanceof Date) {
-                  return dateObj.toISOString().split('T')[0];
+                  return formatDateString(dateObj);
              }
              return dateObj.toString().split('T')[0];
         }
@@ -148,9 +149,6 @@ router.get("/", requireAuth, async (req, res) => {
         // If no entries exist for today/tomorrow, generate templates
         const streamType = await getBatchStreamType(targetBatchId);
         const subjects = getDefaultSubjects(streamType);
-
-        const todayStr = today.toISOString().split("T")[0];
-        const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
         const todayEntries = schedule.filter(s => s.date === todayStr);
         const tomorrowEntries = schedule.filter(s => s.date === tomorrowStr);
@@ -207,23 +205,22 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
     }
 
     try {
-        const finalDateStr = date || new Date().toISOString().split("T")[0];
+        const finalDateStr = date || getTodayDateString();
 
         // Map day names to integers if needed
         const dayNameToInt = { "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6 };
         let finalDayOfWeek = day_of_week ?? dayOfWeek;
 
         if (typeof finalDayOfWeek === "string") {
-            finalDayOfWeek = dayNameToInt[finalDayOfWeek.toLowerCase()] ?? new Date(finalDateStr).getDay();
+            finalDayOfWeek = dayNameToInt[finalDayOfWeek.toLowerCase()] ?? getDayOfWeekFromDateString(finalDateStr);
         } else if (finalDayOfWeek === undefined || finalDayOfWeek === null) {
-            finalDayOfWeek = new Date(finalDateStr).getDay();
+            finalDayOfWeek = getDayOfWeekFromDateString(finalDateStr);
         }
 
         const createData = {
             batch_id: finalBatchId,
-            date: new Date(finalDateStr),
+            date: toDateOnly(finalDateStr),
             day_of_week: finalDayOfWeek,
-            // Postgres parses time strings automatically to time type
             start_time: new Date(`1970-01-01T${(start_time || startTime).trim()}:00Z`),
             end_time: new Date(`1970-01-01T${(end_time || endTime).trim()}:00Z`),
             subject,
@@ -241,7 +238,7 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         const formatDateStr = (dateObj) => {
              if(!dateObj) return "";
              if(dateObj instanceof Date) {
-                  return dateObj.toISOString().split('T')[0];
+                  return formatDateString(dateObj);
              }
              return dateObj.toString().split('T')[0];
         }
@@ -249,7 +246,7 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         const formatTime = (timeInfo) => {
              if (!timeInfo) return "";
              if (timeInfo instanceof Date) {
-                  return timeInfo.toISOString().substr(11, 5); 
+                  return formatTimeOnlyString(timeInfo);
              }
              return timeInfo.toString();
         };
@@ -288,7 +285,7 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
         // Map day names to integers
         const dayNameToInt = { "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6 };
 
-        if (req.body.date !== undefined) updateData.date = new Date(req.body.date);
+        if (req.body.date !== undefined) updateData.date = toDateOnly(req.body.date);
         
         if (req.body.day_of_week !== undefined || req.body.dayOfWeek !== undefined) {
             let dow = req.body.day_of_week ?? req.body.dayOfWeek;
@@ -320,7 +317,7 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
         const formatDateStr = (dateObj) => {
              if(!dateObj) return "";
              if(dateObj instanceof Date) {
-                  return dateObj.toISOString().split('T')[0];
+                  return formatDateString(dateObj);
              }
              return dateObj.toString().split('T')[0];
         }
@@ -328,7 +325,7 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
         const formatTime = (timeInfo) => {
              if (!timeInfo) return "";
              if (timeInfo instanceof Date) {
-                  return timeInfo.toISOString().substr(11, 5); 
+                  return formatTimeOnlyString(timeInfo);
              }
              return timeInfo.toString();
         };
@@ -381,8 +378,7 @@ router.delete("/:id", requireAuth, requireTeacher, async (req, res) => {
  */
 router.delete("/cleanup/old", requireAuth, requireTeacher, async (req, res) => {
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = toDateOnly(getTodayDateString());
 
         const data = await prisma.timetable.deleteMany({
             where: {

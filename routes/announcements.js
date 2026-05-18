@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireTeacher } = require("../middleware/auth");
 const { cache, CACHE_TTL } = require("../services/cache");
+const { formatDateTimeParts } = require("../services/dateTime");
 
 const prisma = new PrismaClient();
 
@@ -36,19 +37,22 @@ router.get("/", requireAuth, async (req, res) => {
         });
 
         // Transform to frontend format
-        const announcements = data.map(a => ({
-            id: a.id,
-            batchId: a.batch_id,
-            authorId: a.author_id,
-            title: a.title,
-            message: a.message,
-            date: a.created_at?.toISOString().split("T")[0] || "",
-            time: a.created_at?.toISOString().split("T")[1]?.substring(0, 5) || "",
-            author: a.user ? `${a.user.first_name || ""} ${a.user.last_name || ""}`.trim() : "Unknown",
-            isImportant: a.is_important || false,
-            tags: a.tags || [],
-            isNew: false
-        }));
+        const announcements = data.map(a => {
+            const createdAt = formatDateTimeParts(a.created_at);
+            return {
+                id: a.id,
+                batchId: a.batch_id,
+                authorId: a.author_id,
+                title: a.title,
+                message: a.message,
+                date: createdAt.date,
+                time: createdAt.time,
+                author: a.user ? `${a.user.first_name || ""} ${a.user.last_name || ""}`.trim() : "Unknown",
+                isImportant: a.is_important || false,
+                tags: a.tags || [],
+                isNew: false
+            };
+        });
 
         cache.set(cacheKey, announcements, CACHE_TTL.AUTH_ROLE); 
         res.json(announcements);
@@ -97,14 +101,16 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         });
 
         cache.invalidatePrefix('announcements:');
+        const createdAt = formatDateTimeParts(data.created_at);
+
         res.json({
             id: data.id,
             batchId: data.batch_id,
             authorId: data.author_id,
             title: data.title,
             message: data.message,
-            date: data.created_at?.toISOString().split("T")[0] || "",
-            time: data.created_at?.toISOString().split("T")[1]?.substring(0, 5) || "",
+            date: createdAt.date,
+            time: createdAt.time,
             author: data.user ? `${data.user.first_name || ""} ${data.user.last_name || ""}`.trim() : "Unknown",
             isImportant: data.is_important || false,
             tags: data.tags || [],

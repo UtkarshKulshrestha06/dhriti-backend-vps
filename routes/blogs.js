@@ -6,6 +6,7 @@ const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { uploadFile, deleteFile } = require("../services/ftpService");
 const { cache, CACHE_TTL } = require("../services/cache");
+const { formatDateString } = require("../services/dateTime");
 
 const prisma = new PrismaClient();
 
@@ -59,7 +60,7 @@ router.get("/sitemap-blogs.xml", async (req, res) => {
 
         // Individual posts
         data.forEach(blog => {
-            const date = blog.updated_at ? new Date(blog.updated_at).toISOString() : new Date().toISOString();
+            const date = formatDateString(blog.updated_at || new Date());
             xml += `  <url>\n    <loc>${baseUrl}/${blog.slug}</loc>\n    <lastmod>${date}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
         });
 
