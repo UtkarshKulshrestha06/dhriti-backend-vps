@@ -12,11 +12,12 @@ const askQuestion = (query) => new Promise(resolve => rl.question(query, resolve
 
 // The precise order is critical to satisfy foreign key constraints
 const TABLE_ORDER = [
-    'users',
-    'streams',
-    'batches',
-    'enrollments',
-    'site_content'
+    'timetable',
+    'blogs',
+    'notebooks',
+    'question_tags',
+    'bookmarks',
+    'bookmark_tag_relations'
 ];
 
 async function migrateData() {
@@ -26,14 +27,14 @@ async function migrateData() {
 
     const sourceUrl = process.env.DATABASE_URL; // Local DB from .env
     console.log(`SOURCE DB: ${sourceUrl ? "Found in .env" : "MISSING!"}`);
-    
+
     if (!sourceUrl) {
         console.error("Error: DATABASE_URL not found in .env");
         process.exit(1);
     }
 
     const targetUrl = await askQuestion("\nPaste your RENDER EXTERNAL DATABASE URL: ");
-    
+
     if (!targetUrl || !targetUrl.startsWith('postgres')) {
         console.error("Invalid database URL.");
         process.exit(1);
@@ -42,7 +43,7 @@ async function migrateData() {
     console.log("\nConnecting to databases...");
 
     const sourceClient = new Client({ connectionString: sourceUrl });
-    const targetClient = new Client({ 
+    const targetClient = new Client({
         connectionString: targetUrl,
         ssl: { rejectUnauthorized: false } // Required for Render external connections
     });
@@ -67,10 +68,10 @@ async function migrateData() {
 
         for (const table of TABLE_ORDER) {
             console.log(`\n📦 Migrating table: ${table}...`);
-            
+
             // Read from source
             const { rows } = await sourceClient.query(`SELECT * FROM "${table}"`);
-            
+
             if (rows.length === 0) {
                 console.log(`   -> 0 rows found. Skipping.`);
                 continue;
@@ -96,6 +97,11 @@ async function migrateData() {
                     const val = row[col];
                     // Convert objects/arrays back to JSON strings, except for Dates
                     if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
+                        // CRITICAL FIX: 'tags' is a Postgres String[], NOT a JSON column.
+                        // The 'pg' driver needs a raw Javascript Array for Postgres arrays!
+                        if (col === 'tags') {
+                            return val;
+                        }
                         return JSON.stringify(val);
                     }
                     return val;

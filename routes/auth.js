@@ -11,16 +11,17 @@ const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '7d';
 async function getSubscribedBatchIds(user) {
   try {
     if (user.role === 'ADMIN' || user.role === 'TEACHER') {
-      const batches = await prisma.$queryRaw`SELECT id::text AS id FROM batches`;
+      const batches = await prisma.batches.findMany({
+        select: { id: true }
+      });
       return batches.map((batch) => batch.id);
     }
 
     if (user.role === 'STUDENT') {
-      const enrollments = await prisma.$queryRaw`
-        SELECT batch_id::text AS batch_id
-        FROM enrollments
-        WHERE user_id = ${user.id}::uuid
-      `;
+      const enrollments = await prisma.enrollments.findMany({
+        where: { user_id: user.id },
+        select: { batch_id: true }
+      });
       return enrollments.map((enrollment) => enrollment.batch_id);
     }
   } catch (error) {

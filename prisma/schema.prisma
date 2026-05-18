@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -15,7 +15,7 @@ enum Role {
 }
 
 model User {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String   @id @default(uuid()) @db.VarChar(36)
   email      String   @unique
   password   String
   role       Role     @default(USER)
@@ -23,9 +23,9 @@ model User {
   last_name  String?
   phone      String?
   subject    String?
-  avatar_url String?
+  avatar_url String?  @db.Text
   login_type String?  @default("email")
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.DateTime(6)
 
   announcements Announcements[]
   enrollments   Enrollments[]
@@ -41,10 +41,10 @@ model User {
 }
 
 model Streams {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
   title       String
-  description String?
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  description String?   @db.Text
+  created_at  DateTime? @default(now()) @db.DateTime(6)
 
   batches Batches[]
 
@@ -53,10 +53,10 @@ model Streams {
 
 model Batches {
   id               String    @id
-  stream_id        String?   @db.Uuid
+  stream_id        String?   @db.VarChar(36)
   title            String
   subtitle         String?
-  description      String?
+  description      String?   @db.Text
   class_name       String?
   target_year      String?
   duration         String?
@@ -64,11 +64,11 @@ model Batches {
   registration_fee String?
   batch_date       DateTime? @db.Date
   end_date         DateTime? @db.Date
-  syllabus_url     String?
-  image_url        String?
+  syllabus_url     String?   @db.Text
+  image_url        String?   @db.Text
   color_theme      String?
   is_active        Boolean?  @default(true)
-  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  created_at       DateTime? @default(now()) @db.DateTime(6)
 
   stream        Streams?        @relation(fields: [stream_id], references: [id])
   announcements Announcements[]
@@ -83,11 +83,11 @@ model Batches {
 }
 
 model Subjects {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
   batch_id    String?
   name        String
   order_index Int?      @default(0)
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
 
   batch     Batches?    @relation(fields: [batch_id], references: [id])
   chapters  Chapters[]
@@ -97,12 +97,12 @@ model Subjects {
 }
 
 model Chapters {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  subject_id     String?   @db.Uuid
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  subject_id     String?   @db.VarChar(36)
   batch_id       String?
   title          String
   chapter_number Int
-  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.DateTime(6)
 
   subject   Subjects?   @relation(fields: [subject_id], references: [id])
   batch     Batches?    @relation(fields: [batch_id], references: [id])
@@ -112,9 +112,9 @@ model Chapters {
 }
 
 model Enrollments {
-  user_id     String    @db.Uuid
+  user_id     String    @db.VarChar(36)
   batch_id    String
-  enrolled_at DateTime? @default(now()) @db.Timestamptz(6)
+  enrolled_at DateTime? @default(now()) @db.DateTime(6)
 
   user  User    @relation(fields: [user_id], references: [id])
   batch Batches @relation(fields: [batch_id], references: [id])
@@ -124,41 +124,41 @@ model Enrollments {
 }
 
 model Freebies {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         String    @id @default(uuid()) @db.VarChar(36)
   title      String
   subject    String
   type       String
-  file_url   String
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  file_url   String    @db.Text
+  created_at DateTime? @default(now()) @db.DateTime(6)
 
   @@map("freebies")
 }
 
 model Inquiries {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String    @id @default(uuid()) @db.VarChar(36)
   name           String
   email          String?
   phone          String
-  message        String?
+  message        String?   @db.Text
   batch_interest String?
   status         String?   @default("pending")
-  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.DateTime(6)
 
   @@map("inquiries")
 }
 
 model Resources {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
   batch_id    String?
-  subject_id  String?   @db.Uuid
-  chapter_id  String?   @db.Uuid
+  subject_id  String?   @db.VarChar(36)
+  chapter_id  String?   @db.VarChar(36)
   title       String
   type        String
-  file_url    String
+  file_url    String    @db.Text
   file_size   BigInt?
-  uploaded_by String?   @db.Uuid
+  uploaded_by String?   @db.VarChar(36)
   is_free     Boolean?  @default(false)
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
 
   batch   Batches?  @relation(fields: [batch_id], references: [id])
   subject Subjects? @relation(fields: [subject_id], references: [id])
@@ -171,8 +171,8 @@ model Resources {
 model SiteContent {
   key        String    @id
   value      Json?     @default("[]")
-  updated_at DateTime? @default(now()) @db.Timestamptz(6)
-  updated_by String?   @db.Uuid
+  updated_at DateTime? @default(now()) @db.DateTime(6)
+  updated_by String?   @db.VarChar(36)
 
   user User? @relation(fields: [updated_by], references: [id])
 
@@ -180,16 +180,16 @@ model SiteContent {
 }
 
 model Tests {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id               String    @id @default(uuid()) @db.VarChar(36)
   batch_id         String?
   name             String
   config           Json?     @default("{}")
   schedule         Json?     @default("{}")
   questions        Json?     @default("[]")
   duration_minutes Int?      @default(180)
-  created_by       String?   @db.Uuid
-  created_at       DateTime? @default(now()) @db.Timestamptz(6)
-  tags             String[]
+  created_by       String?   @db.VarChar(36)
+  created_at       DateTime? @default(now()) @db.DateTime(6)
+  tags             Json?     @default("[]")
   answer_key       Json?     @default("{}")
   is_free          Boolean?  @default(false)
   test_type        String?   @default("FULL_SYLLABUS")
@@ -203,9 +203,9 @@ model Tests {
 }
 
 model TestAttempts {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  test_id        String    @db.Uuid
-  student_id     String    @db.Uuid
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  test_id        String    @db.VarChar(36)
+  student_id     String    @db.VarChar(36)
   student_name   String?
   score          Int?      @default(0)
   max_score      Int?      @default(0)
@@ -215,7 +215,7 @@ model TestAttempts {
   status         Json?     @default("{}")
   time_spent     Json?     @default("{}")
   question_keys  Json?     @default("{}")
-  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.DateTime(6)
   subject_scores Json?     @default("{}")
   is_submitted   Boolean?  @default(true)
 
@@ -226,7 +226,7 @@ model TestAttempts {
 }
 
 model Timetable {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(uuid()) @db.VarChar(36)
   batch_id      String?
   day_of_week   Int?
   start_time    DateTime  @db.Time
@@ -234,8 +234,8 @@ model Timetable {
   subject       String?
   topic         String?
   faculty       String?
-  date          DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  date          DateTime? @default(dbgenerated("(curdate())")) @db.Date
+  created_at    DateTime? @default(now()) @db.DateTime(6)
   is_compulsory Boolean?  @default(true)
 
   batch Batches? @relation(fields: [batch_id], references: [id])
@@ -244,14 +244,14 @@ model Timetable {
 }
 
 model Announcements {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id           String    @id @default(uuid()) @db.VarChar(36)
   batch_id     String?
   title        String
-  message      String
-  author_id    String?   @db.Uuid
+  message      String    @db.Text
+  author_id    String?   @db.VarChar(36)
   is_important Boolean?  @default(false)
-  tags         String[]
-  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  tags         Json?     @default("[]")
+  created_at   DateTime? @default(now()) @db.DateTime(6)
 
   batch Batches? @relation(fields: [batch_id], references: [id])
   user  User?    @relation(fields: [author_id], references: [id])
@@ -264,28 +264,28 @@ model Announcements {
 // -----------------------------------------------------
 
 model Blogs {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(uuid()) @db.VarChar(36)
   slug          String    @unique
   title         String
-  excerpt       String?
-  cover_image   String?
+  excerpt       String?   @db.Text
+  cover_image   String?   @db.Text
   category      String
   author_name   String
-  author_avatar String?
-  published_at  DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  author_avatar String?   @db.Text
+  published_at  DateTime? @default(dbgenerated("(curdate())")) @db.Date
   read_time     String?
   sections      Json?     @default("[]")
-  tags          String[]
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+  tags          Json?     @default("[]")
+  created_at    DateTime? @default(now()) @db.DateTime(6)
+  updated_at    DateTime? @default(now()) @db.DateTime(6)
 
   @@map("blogs")
 }
 
 model Results {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String    @id @default(uuid()) @db.VarChar(36)
   name            String
-  image_url       String?
+  image_url       String?   @db.Text
   rank            String?
   score           String?
   exam_type       String
@@ -293,17 +293,17 @@ model Results {
   year            String?
   is_hall_of_fame Boolean?  @default(false)
   result_type     String?
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  created_at      DateTime? @default(now()) @db.DateTime(6)
+  updated_at      DateTime? @default(now()) @db.DateTime(6)
 
   @@map("results")
 }
 
 model Notebooks {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
-  user_id     String    @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+  updated_at  DateTime? @default(now()) @db.DateTime(6)
+  user_id     String    @db.VarChar(36)
   title       String
   description String?
 
@@ -314,9 +314,9 @@ model Notebooks {
 }
 
 model QuestionTags {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  user_id     String    @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+  user_id     String    @db.VarChar(36)
   name        String
   color       String?   @default("#3b82f6")
 
@@ -327,12 +327,12 @@ model QuestionTags {
 }
 
 model Bookmarks {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
-  user_id     String    @db.Uuid
-  notebook_id String    @db.Uuid
-  test_id     String    @db.Uuid
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+  updated_at  DateTime? @default(now()) @db.DateTime(6)
+  user_id     String    @db.VarChar(36)
+  notebook_id String    @db.VarChar(36)
+  test_id     String    @db.VarChar(36)
   question_id String
   notes       String?
 
@@ -345,9 +345,9 @@ model Bookmarks {
 }
 
 model BookmarkTagRelations {
-  bookmark_id String    @db.Uuid
-  tag_id      String    @db.Uuid
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  bookmark_id String    @db.VarChar(36)
+  tag_id      String    @db.VarChar(36)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
 
   bookmark Bookmarks    @relation(fields: [bookmark_id], references: [id])
   tag      QuestionTags @relation(fields: [tag_id], references: [id])

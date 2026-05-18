@@ -7,7 +7,14 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "postinstall": "node node_modules/prisma/build/index.js generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/*.test.js",
+    "db:validate": "prisma validate",
+    "db:generate": "prisma generate",
+    "db:mysql:push": "prisma db push",
+    "db:mysql:import:parse": "node scripts/import_render_pg_dump_to_mysql.js --parse-only",
+    "db:mysql:import:dry": "node scripts/import_render_pg_dump_to_mysql.js",
+    "db:mysql:import": "node scripts/import_render_pg_dump_to_mysql.js --execute",
+    "db:mysql:verify": "node scripts/import_render_pg_dump_to_mysql.js --verify-only"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +31,7 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
+    "mysql2": "^3.22.3",
     "pg": "^8.20.0",
     "prisma": "^6.19.3",
     "resend": "^6.12.0"

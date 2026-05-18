@@ -51,7 +51,15 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '35mb' }));
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: 'Test payload too large. Reduce embedded images or split the test into smaller parts.'
+    });
+  }
+  return next(err);
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

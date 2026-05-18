@@ -2,8 +2,154 @@ const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireAdmin, requireTeacher } = require("../middleware/auth");
+const { calculatePdf2CbtScore } = require("../services/pdf2cbtEngine");
 
 const prisma = new PrismaClient();
+
+function isPdf2CbtV2Payload(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    const config = payload.config && typeof payload.config === 'object' ? payload.config : payload;
+    return config.schemaVersion === 2 && config.engine === 'pdf2cbt';
+}
+
+function getProvidedAnswerKey(payload) {
+    return payload.answer_key ?? payload.answerKey ?? payload.testAnswerKey ?? payload.answerKeyData;
+}
+
+function getProvidedTestData(payload) {
+    return payload.questions ?? payload.testInterfaceData ?? payload.testData;
+}
+
+function getDurationMinutes(payload, config) {
+    return payload.duration_minutes
+        || payload.durationMinutes
+        || config?.testConfig?.durationMinutes
+        || config?.durationMinutes
+        || 180;
+}
+
+function normalizeV2Config(payload) {
+    const incomingConfig = payload.config && typeof payload.config === 'object' ? payload.config : {};
+    if (!isPdf2CbtV2Payload(payload)) return incomingConfig;
+
+    return {
+        ...incomingConfig,
+        schemaVersion: 2,
+        engine: 'pdf2cbt',
+        testConfig: incomingConfig.testConfig || payload.testConfig || {
+            name: payload.name || payload.title || "Untitled Test",
+            durationMinutes: payload.duration_minutes || payload.durationMinutes || 180,
+            pattern: payload.patternType || payload.pattern || "CUSTOM",
+            subjects: [],
+            sections: []
+        },
+        pdfCropperData: incomingConfig.pdfCropperData ?? payload.pdfCropperData,
+        source: incomingConfig.source ?? payload.source,
+        solutions: incomingConfig.solutions ?? payload.solutions,
+        legacyMeta: incomingConfig.legacyMeta ?? payload.legacyMeta
+    };
+}
+
+function buildPdf2CbtResultPayload(result) {
+    return {
+        counts: {
+            correct: result.correct,
+            incorrect: result.incorrect,
+            partial: result.partial,
+            unanswered: result.unanswered,
+            bonus: result.bonus,
+            dropped: result.dropped
+        },
+        sectionScores: result.sectionScores,
+        questionResults: result.questionResults,
+        totalQuestions: result.totalQuestions
+    };
+}
+
+const MAX_V2_TEST_PAYLOAD_BYTES = 28 * 1024 * 1024;
+const MAX_V2_QUESTION_COUNT = 400;
+
+function estimateJsonSizeBytes(value) {
+    try {
+        return Buffer.byteLength(JSON.stringify(value || {}), "utf8");
+    } catch {
+        return Number.MAX_SAFE_INTEGER;
+    }
+}
+
+function countPdf2CbtQuestions(testData) {
+    if (!testData || typeof testData !== "object") return 0;
+    return Object.values(testData).reduce((subjectTotal, subjectData) => {
+        if (!subjectData || typeof subjectData !== "object") return subjectTotal;
+        return subjectTotal + Object.values(subjectData).reduce((sectionTotal, sectionData) => {
+            if (!sectionData || typeof sectionData !== "object") return sectionTotal;
+            return sectionTotal + Object.keys(sectionData).length;
+        }, 0);
+    }, 0);
+}
+
+function validatePdf2CbtPayload({ name, config, testData, answerKey, durationMinutes, payload }) {
+    const errors = [];
+    const questionCount = countPdf2CbtQuestions(testData);
+    const payloadSize = estimateJsonSizeBytes(payload);
+
+    if (!name || !`${name}`.trim()) {
+        errors.push("Test name is required.");
+    }
+
+    if (!config || config.schemaVersion !== 2 || config.engine !== "pdf2cbt") {
+        errors.push("Invalid PDF2CBT config metadata.");
+    }
+
+    if (!testData || typeof testData !== "object" || questionCount === 0) {
+        errors.push("PDF2CBT test data must contain at least one question.");
+    }
+
+    if (!answerKey || typeof answerKey !== "object") {
+        errors.push("PDF2CBT answer key payload is invalid.");
+    }
+
+    if (!Number.isFinite(Number(durationMinutes)) || Number(durationMinutes) <= 0 || Number(durationMinutes) > 720) {
+        errors.push("Duration minutes must be between 1 and 720.");
+    }
+
+    if (questionCount > MAX_V2_QUESTION_COUNT) {
+        errors.push(`PDF2CBT test exceeds the supported question limit of ${MAX_V2_QUESTION_COUNT}.`);
+    }
+
+    if (payloadSize > MAX_V2_TEST_PAYLOAD_BYTES) {
+        errors.push("PDF2CBT payload is too large. Reduce embedded images or split the test.");
+    }
+
+    if (testData && answerKey && typeof testData === "object" && typeof answerKey === "object") {
+        for (const [subject, subjectData] of Object.entries(testData)) {
+            for (const [section, sectionData] of Object.entries(subjectData || {})) {
+                for (const [questionKey, questionData] of Object.entries(sectionData || {})) {
+                    const keyData = answerKey?.[subject]?.[section]?.[questionKey];
+                    const type = questionData?.type || keyData?.type;
+                    if (!type) {
+                        errors.push(`Missing question type for ${subject} / ${section} / ${questionKey}.`);
+                    }
+
+                    if (!questionData?.marks || !Number.isFinite(Number(questionData.marks.cm)) || !Number.isFinite(Number(questionData.marks.im))) {
+                        errors.push(`Invalid marks for ${subject} / ${section} / ${questionKey}.`);
+                    }
+
+                    const imageUrls = questionData?.pdfData?.imageUrls;
+                    if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+                        errors.push(`Missing question image for ${subject} / ${section} / ${questionKey}.`);
+                    }
+
+                    if (keyData && keyData.type && keyData.type !== type) {
+                        errors.push(`Answer key type mismatch for ${subject} / ${section} / ${questionKey}.`);
+                    }
+                }
+            }
+        }
+    }
+
+    return [...new Set(errors)];
+}
 
 /**
  * Helper: Extract answer key from questions array
@@ -161,6 +307,46 @@ async function recalculateAllAttempts(testId, answerKey, config, questions) {
     return { updated };
 }
 
+async function recalculateAllPdf2CbtAttempts(testId, answerKey, testData) {
+    const attempts = await prisma.testAttempts.findMany({
+        where: { test_id: testId },
+        select: { id: true, answers: true, status: true, time_spent: true }
+    });
+
+    if (!attempts || attempts.length === 0) return { updated: 0 };
+
+    let updated = 0;
+    for (const attempt of attempts) {
+        const result = calculatePdf2CbtScore({
+            testData: testData || {},
+            answerKey: answerKey || {},
+            answers: attempt.answers || {},
+            status: attempt.status || {},
+            timeSpent: attempt.time_spent || {}
+        });
+
+        try {
+            await prisma.testAttempts.update({
+                where: { id: attempt.id },
+                data: {
+                    score: result.score,
+                    max_score: result.maxScore,
+                    accuracy: result.accuracy,
+                    subject_scores: result.subjectScores,
+                    status: {
+                        ...(attempt.status || {}),
+                        pdf2cbtResult: buildPdf2CbtResultPayload(result)
+                    }
+                }
+            });
+            updated++;
+        } catch (updateError) {
+            console.error(`Failed to update PDF2CBT attempt ${attempt.id}:`, updateError);
+        }
+    }
+    return { updated };
+}
+
 /**
  * GET /tests/free
  * Get all free tests (accessible by any authenticated user)
@@ -248,6 +434,8 @@ router.get("/attempts/me", requireAuth, async (req, res) => {
             status: a.status || {},
             timeSpent: a.time_spent || {},
             questionKeys: a.question_keys || {},
+            subjectScores: a.subject_scores || {},
+            result: a.status?.pdf2cbtResult,
             isSubmitted: a.is_submitted !== false,
             timestamp: new Date(a.created_at).getTime()
         }));
@@ -335,6 +523,8 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         config,
         schedule,
         questions,
+        answer_key,
+        answerKey,
         duration_minutes,
         durationMinutes,
         tags,
@@ -349,17 +539,38 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
     }
 
     try {
-        const answerKey = extractAnswerKey(questions);
+        const isV2Test = isPdf2CbtV2Payload(req.body);
+        const finalConfig = isV2Test ? normalizeV2Config(req.body) : (config || {});
+        const finalQuestions = isV2Test ? (getProvidedTestData(req.body) || {}) : (questions || []);
+        const providedAnswerKey = answer_key ?? answerKey ?? getProvidedAnswerKey(req.body);
+        const finalAnswerKey = isV2Test
+            ? (providedAnswerKey || {})
+            : extractAnswerKey(questions);
         const isFree = finalBatchId === 'free-tests';
+
+        if (isV2Test) {
+            const validationErrors = validatePdf2CbtPayload({
+                name: finalName,
+                config: finalConfig,
+                testData: finalQuestions,
+                answerKey: finalAnswerKey,
+                durationMinutes: getDurationMinutes(req.body, finalConfig),
+                payload: req.body
+            });
+
+            if (validationErrors.length > 0) {
+                return res.status(400).json({ error: validationErrors[0], details: validationErrors });
+            }
+        }
 
         const insertData = {
             batch_id: isFree ? null : finalBatchId,
             name: finalName,
-            config: config || {},
+            config: finalConfig,
             schedule: schedule || {},
-            questions: questions || [],
-            answer_key: answerKey,
-            duration_minutes: duration_minutes || durationMinutes || 180,
+            questions: finalQuestions,
+            answer_key: finalAnswerKey,
+            duration_minutes: getDurationMinutes(req.body, finalConfig),
             tags: tags || [],
             created_by: req.user.id,
             is_free: isFree,
@@ -395,18 +606,38 @@ router.post("/import", requireAuth, requireTeacher, async (req, res) => {
     try {
         const imported = importSource;
         const isFree = finalBatchId === 'free-tests';
+        const isV2Test = isPdf2CbtV2Payload(imported);
+        const finalConfig = isV2Test ? normalizeV2Config(imported) : (imported.config || {});
+        const finalQuestions = isV2Test ? (getProvidedTestData(imported) || {}) : (imported.questions || []);
 
         // Compute answer_key from questions if not provided in import data
-        const answerKey = imported.answer_key || extractAnswerKey(imported.questions || []);
+        const answerKey = isV2Test
+            ? (getProvidedAnswerKey(imported) || {})
+            : (imported.answer_key || extractAnswerKey(imported.questions || []));
+
+        if (isV2Test) {
+            const validationErrors = validatePdf2CbtPayload({
+                name: imported.name || "Imported Test",
+                config: finalConfig,
+                testData: finalQuestions,
+                answerKey,
+                durationMinutes: getDurationMinutes(imported, finalConfig),
+                payload: imported
+            });
+
+            if (validationErrors.length > 0) {
+                return res.status(400).json({ error: validationErrors[0], details: validationErrors });
+            }
+        }
 
         const insertData = {
             batch_id: isFree ? null : finalBatchId,
             name: imported.name || "Imported Test",
-            config: imported.config || {},
+            config: finalConfig,
             schedule: imported.schedule || {},
-            questions: imported.questions || [],
+            questions: finalQuestions,
             answer_key: answerKey,
-            duration_minutes: imported.duration_minutes || 180,
+            duration_minutes: getDurationMinutes(imported, finalConfig),
             tags: imported.tags || [],
             created_by: req.user.id,
             is_free: isFree,
@@ -457,6 +688,7 @@ router.get("/:id/leaderboard", requireAuth, async (req, res) => {
             accuracy: a.accuracy ? Number(a.accuracy) : 0,
             timeTaken: a.time_taken || 0,
             subjectScores: a.subject_scores || {},
+            result: a.status?.pdf2cbtResult,
             timestamp: new Date(a.created_at).getTime()
         }));
 
@@ -495,6 +727,17 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
     const finalIsSubmitted = isSubmitted !== false; // defaults to true if undefined
 
     try {
+        const testData = await prisma.tests.findUnique({
+            where: { id },
+            select: { config: true, answer_key: true, questions: true }
+        });
+
+        if (!testData) {
+            return res.status(404).json({ error: "Test not found" });
+        }
+
+        const isV2Test = isPdf2CbtV2Payload(testData);
+
         // Get student name
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
@@ -519,20 +762,41 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
 
         const statusObj = status || {};
         statusObj.is_submitted = finalIsSubmitted;
+        const timeSpentObj = timeSpent || time_spent || {};
+        let finalScore = score || 0;
+        let finalMaxScore = maxScore || max_score || 0;
+        let finalAccuracy = accuracy || 0;
+        let finalSubjectScores = subjectScores || subject_scores || {};
+
+        if (isV2Test) {
+            const result = calculatePdf2CbtScore({
+                testData: testData.questions || {},
+                answerKey: testData.answer_key || {},
+                answers: answers || {},
+                status: status || {},
+                timeSpent: timeSpentObj
+            });
+
+            finalScore = result.score;
+            finalMaxScore = result.maxScore;
+            finalAccuracy = result.accuracy;
+            finalSubjectScores = result.subjectScores;
+            statusObj.pdf2cbtResult = buildPdf2CbtResultPayload(result);
+        }
 
         const payload = {
             test_id: id,
             student_id: req.user.id,
             student_name: studentName,
-            score: score || 0,
-            max_score: maxScore || max_score || 0,
-            accuracy: accuracy || 0,
+            score: finalScore,
+            max_score: finalMaxScore,
+            accuracy: finalAccuracy,
             time_taken: timeTaken || time_taken || 0,
             answers: answers || {},
             status: statusObj,
-            time_spent: timeSpent || time_spent || {},
+            time_spent: timeSpentObj,
             question_keys: questionKeys || question_keys || {},
-            subject_scores: subjectScores || subject_scores || {},
+            subject_scores: finalSubjectScores,
             is_submitted: finalIsSubmitted
         };
 
@@ -559,7 +823,13 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
             maxScore: data.max_score ? Number(data.max_score) : 0,
             accuracy: data.accuracy ? Number(data.accuracy) : 0,
             timeTaken: data.time_taken,
+            answers: data.answers || {},
+            status: data.status || {},
+            timeSpent: data.time_spent || {},
+            questionKeys: data.question_keys || {},
             subjectScores: data.subject_scores || {},
+            result: data.status?.pdf2cbtResult,
+            isSubmitted: data.is_submitted !== false,
             timestamp: new Date(data.created_at).getTime()
         });
     } catch (err) {
@@ -589,7 +859,7 @@ router.post("/:id/attempts/:attemptId/recalculate", requireAuth, async (req, res
         // Fetch the specific attempt
         const attempt = await prisma.testAttempts.findUnique({
             where: { id: attemptId },
-            select: { id: true, student_id: true, answers: true }
+            select: { id: true, student_id: true, answers: true, status: true, time_spent: true }
         });
 
         if (!attempt) {
@@ -601,18 +871,53 @@ router.post("/:id/attempts/:attemptId/recalculate", requireAuth, async (req, res
             return res.status(403).json({ error: "Not authorized to recalculate this attempt" });
         }
 
-        // Calculate the correct score using backend's fixed grading algorithm (with subject scores)
-        const { score, maxScore, accuracy, subjectScores } = recalculateScore(
-            attempt.answers || {}, 
-            testData.answer_key || {}, 
-            testData.config || {}, 
-            testData.questions || []
-        );
+        const isV2Test = isPdf2CbtV2Payload(testData);
+        let resultPayload;
+        let score;
+        let maxScore;
+        let accuracy;
+        let subjectScores;
+
+        if (isV2Test) {
+            const result = calculatePdf2CbtScore({
+                testData: testData.questions || {},
+                answerKey: testData.answer_key || {},
+                answers: attempt.answers || {},
+                status: attempt.status || {},
+                timeSpent: attempt.time_spent || {}
+            });
+            score = result.score;
+            maxScore = result.maxScore;
+            accuracy = result.accuracy;
+            subjectScores = result.subjectScores;
+            resultPayload = buildPdf2CbtResultPayload(result);
+        } else {
+            // Calculate the correct score using backend's fixed grading algorithm (with subject scores)
+            const legacyResult = recalculateScore(
+                attempt.answers || {},
+                testData.answer_key || {},
+                testData.config || {},
+                testData.questions || []
+            );
+            score = legacyResult.score;
+            maxScore = legacyResult.maxScore;
+            accuracy = legacyResult.accuracy;
+            subjectScores = legacyResult.subjectScores;
+        }
 
         // Update the attempt in the database (including subject_scores)
+        const updateData = { score, max_score: maxScore, accuracy, subject_scores: subjectScores };
+        if (resultPayload) {
+            updateData.status = {
+                ...(attempt.status || {}),
+                pdf2cbtResult: resultPayload,
+                is_submitted: attempt.status?.is_submitted !== false
+            };
+        }
+
         const updatedAttempt = await prisma.testAttempts.update({
             where: { id: attemptId },
-            data: { score, max_score: maxScore, accuracy, subject_scores: subjectScores }
+            data: updateData
         });
 
         res.json({
@@ -620,7 +925,8 @@ router.post("/:id/attempts/:attemptId/recalculate", requireAuth, async (req, res
             score: updatedAttempt.score ? Number(updatedAttempt.score) : 0,
             maxScore: updatedAttempt.max_score ? Number(updatedAttempt.max_score) : 0,
             accuracy: updatedAttempt.accuracy ? Number(updatedAttempt.accuracy) : 0,
-            subjectScores: updatedAttempt.subject_scores || {}
+            subjectScores: updatedAttempt.subject_scores || {},
+            result: updatedAttempt.status?.pdf2cbtResult
         });
 
     } catch (err) {
@@ -638,8 +944,10 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
 
     try {
         const updateData = {};
+        const isV2Test = isPdf2CbtV2Payload(req.body);
+        let existingV2Test = null;
         if (req.body.name !== undefined) updateData.name = req.body.name;
-        if (req.body.config !== undefined) updateData.config = req.body.config;
+        if (req.body.config !== undefined || isV2Test) updateData.config = isV2Test ? normalizeV2Config(req.body) : req.body.config;
         if (req.body.schedule !== undefined) updateData.schedule = req.body.schedule;
         if (req.body.tags !== undefined) updateData.tags = req.body.tags;
         if (req.body.test_type !== undefined) updateData.test_type = req.body.test_type;
@@ -648,14 +956,71 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
 
         // Handle answer key extraction and score recalculation ONLY if questions are provided
         let attemptsRecalculated = 0;
-        if (req.body.questions !== undefined) {
-            updateData.questions = req.body.questions;
-            const newAnswerKey = extractAnswerKey(req.body.questions);
-            updateData.answer_key = newAnswerKey;
+        const providedQuestions = getProvidedTestData(req.body);
+        if (providedQuestions !== undefined) {
+            updateData.questions = providedQuestions;
 
-            // Recalculate scores for existing attempts
-            const result = await recalculateAllAttempts(id, newAnswerKey, req.body.config, req.body.questions);
-            attemptsRecalculated = result.updated;
+            if (isV2Test) {
+                const providedAnswerKey = getProvidedAnswerKey(req.body);
+                if (providedAnswerKey !== undefined) {
+                    updateData.answer_key = providedAnswerKey;
+                }
+
+                if (updateData.answer_key === undefined) {
+                    existingV2Test = existingV2Test || await prisma.tests.findUnique({
+                        where: { id },
+                        select: { answer_key: true, questions: true }
+                    });
+                    updateData.answer_key = existingV2Test?.answer_key || {};
+                }
+
+                const result = await recalculateAllPdf2CbtAttempts(id, updateData.answer_key, providedQuestions);
+                attemptsRecalculated = result.updated;
+            } else {
+                const newAnswerKey = extractAnswerKey(providedQuestions);
+                updateData.answer_key = newAnswerKey;
+
+                // Recalculate scores for existing attempts
+                const result = await recalculateAllAttempts(id, newAnswerKey, req.body.config, providedQuestions);
+                attemptsRecalculated = result.updated;
+            }
+        } else if (isV2Test) {
+            const providedAnswerKey = getProvidedAnswerKey(req.body);
+            if (providedAnswerKey !== undefined) {
+                updateData.answer_key = providedAnswerKey;
+
+                existingV2Test = existingV2Test || await prisma.tests.findUnique({
+                    where: { id },
+                    select: { answer_key: true, questions: true }
+                });
+                const result = await recalculateAllPdf2CbtAttempts(id, providedAnswerKey, existingV2Test?.questions || {});
+                attemptsRecalculated = result.updated;
+            }
+        }
+
+        if (isV2Test) {
+            const currentSnapshot = await prisma.tests.findUnique({
+                where: { id },
+                select: { name: true, questions: true, answer_key: true, config: true, duration_minutes: true }
+            });
+
+            const validationErrors = validatePdf2CbtPayload({
+                name: updateData.name || currentSnapshot?.name,
+                config: updateData.config || currentSnapshot?.config,
+                testData: updateData.questions !== undefined ? updateData.questions : currentSnapshot?.questions,
+                answerKey: updateData.answer_key !== undefined ? updateData.answer_key : currentSnapshot?.answer_key,
+                durationMinutes: updateData.duration_minutes || currentSnapshot?.duration_minutes || 180,
+                payload: {
+                    ...req.body,
+                    config: updateData.config || currentSnapshot?.config,
+                    questions: updateData.questions !== undefined ? updateData.questions : currentSnapshot?.questions,
+                    answer_key: updateData.answer_key !== undefined ? updateData.answer_key : currentSnapshot?.answer_key
+                }
+            });
+
+            if (validationErrors.length > 0) {
+                return res.status(400).json({ error: validationErrors[0], details: validationErrors });
+            }
         }
 
         const data = await prisma.tests.update({
@@ -678,8 +1043,40 @@ router.delete("/:id", requireAuth, requireTeacher, async (req, res) => {
     const { id } = req.params;
 
     try {
-        await prisma.tests.delete({
-            where: { id }
+        const existingTest = await prisma.tests.findUnique({
+            where: { id },
+            select: { id: true }
+        });
+
+        if (!existingTest) {
+            return res.status(404).json({ error: "Test not found" });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            const bookmarks = await tx.bookmarks.findMany({
+                where: { test_id: id },
+                select: { id: true }
+            });
+
+            const bookmarkIds = bookmarks.map((bookmark) => bookmark.id);
+
+            if (bookmarkIds.length > 0) {
+                await tx.bookmarkTagRelations.deleteMany({
+                    where: { bookmark_id: { in: bookmarkIds } }
+                });
+            }
+
+            await tx.bookmarks.deleteMany({
+                where: { test_id: id }
+            });
+
+            await tx.testAttempts.deleteMany({
+                where: { test_id: id }
+            });
+
+            await tx.tests.delete({
+                where: { id }
+            });
         });
 
         res.json({ success: true });

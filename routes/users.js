@@ -11,12 +11,15 @@ const prisma = new PrismaClient();
 async function getSubscribedBatchIds(userId, role) {
   try {
     if (role === 'ADMIN' || role === 'TEACHER') {
-      const batches = await prisma.$queryRaw`SELECT id::text AS id FROM batches`;
+      const batches = await prisma.batches.findMany({
+        select: { id: true }
+      });
       return batches.map((b) => b.id);
     }
-    const enrollments = await prisma.$queryRaw`
-      SELECT batch_id::text AS batch_id FROM enrollments WHERE user_id = ${userId}::uuid
-    `;
+    const enrollments = await prisma.enrollments.findMany({
+      where: { user_id: userId },
+      select: { batch_id: true }
+    });
     return enrollments.map((e) => e.batch_id);
   } catch {
     return [];
@@ -216,7 +219,7 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
 
   try {
     // Cascade delete enrollments first (in case FK constraints aren't set up)
-    await prisma.enrollment.deleteMany({ where: { user_id: id } });
+    await prisma.enrollments.deleteMany({ where: { user_id: id } });
 
     await prisma.user.delete({ where: { id } });
 

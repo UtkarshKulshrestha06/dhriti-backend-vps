@@ -148,7 +148,7 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
         if (is_important !== undefined || isImportant !== undefined) {
             updateData.is_important = is_important ?? isImportant;
         }
-        if (tags !== undefined) updateData.tags = { set: tags };
+        if (tags !== undefined) updateData.tags = Array.isArray(tags) ? tags : [];
 
         const data = await prisma.announcements.update({
             where: { id },
