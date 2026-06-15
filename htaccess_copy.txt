@@ -1,0 +1,44 @@
+RewriteEngine On
+
+# Redirect sitemap to backend endpoint
+RewriteRule ^sitemap-blogs\.xml$ https://dhriti-backend-vps.onrender.com/blogs/sitemap-blogs.xml [R=301,L]
+
+# Handle SPA routing - redirect all non-file requests to index.html
+RewriteBase /
+RewriteRule ^index\.html$ - [L]
+
+# Exclude specific file extensions from SPA routing (Force 404 if missing instead of loading app)
+RewriteRule \.(pdf|jpg|jpeg|png|gif|webp)$ - [L]
+
+# Stop rewriting for uploads directory - serve as static files
+# If file is missing, let server handle 404 (don't route to React)
+# Strict exclusion for uploads - Do NOT route to React
+RewriteRule ^uploads($|/) - [L,NC]
+RewriteRule ^test/uploads($|/) - [L,NC]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+# Enable CORS for assets
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>
+
+# Compression for better performance
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>

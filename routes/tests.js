@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
+const { randomUUID } = require("crypto");
+const prisma = require("../services/prisma");
 const { requireAuth, requireAdmin, requireTeacher } = require("../middleware/auth");
 const { calculatePdf2CbtScore } = require("../services/pdf2cbtEngine");
 
-const prisma = new PrismaClient();
 
 function isPdf2CbtV2Payload(payload) {
     if (!payload || typeof payload !== 'object') return false;
@@ -68,6 +68,120 @@ function buildPdf2CbtResultPayload(result) {
 
 const MAX_V2_TEST_PAYLOAD_BYTES = 28 * 1024 * 1024;
 const MAX_V2_QUESTION_COUNT = 400;
+const FREE_TESTS_BATCH_ID = "free-tests";
+const TEST_STATUS = {
+    DRAFT: "DRAFT",
+    PUBLISHED: "PUBLISHED",
+    ARCHIVED: "ARCHIVED"
+};
+const ASSIGNMENT_STATUS = {
+    ACTIVE: "ACTIVE",
+    HIDDEN: "HIDDEN",
+    ARCHIVED: "ARCHIVED"
+};
+const AUDIENCE_TYPE = {
+    BATCH: "BATCH",
+    FREE: "FREE"
+};
+
+function normalizeStatus(value, fallback = TEST_STATUS.DRAFT) {
+    const normalized = `${value || fallback}`.toUpperCase();
+    return Object.values(TEST_STATUS).includes(normalized) ? normalized : fallback;
+}
+
+function normalizeAssignmentStatus(value, fallback = ASSIGNMENT_STATUS.ACTIVE) {
+    const normalized = `${value || fallback}`.toUpperCase();
+    return Object.values(ASSIGNMENT_STATUS).includes(normalized) ? normalized : fallback;
+}
+
+function normalizeAudienceType(value, batchId) {
+    const normalized = `${value || ""}`.toUpperCase();
+    if (normalized === AUDIENCE_TYPE.FREE || batchId === FREE_TESTS_BATCH_ID) return AUDIENCE_TYPE.FREE;
+    return AUDIENCE_TYPE.BATCH;
+}
+
+function jsonObject(value) {
+    return value && typeof value === "object" ? value : {};
+}
+
+function formatAssignmentTest(test, assignment) {
+    if (!assignment) return test;
+    return {
+        ...test,
+        assignmentId: assignment.id,
+        testAssignmentId: assignment.id,
+        audienceType: assignment.audience_type,
+        assignmentStatus: assignment.status,
+        batch_id: assignment.audience_type === AUDIENCE_TYPE.FREE ? null : assignment.batch_id,
+        is_free: assignment.audience_type === AUDIENCE_TYPE.FREE,
+        schedule: jsonObject(assignment.schedule),
+        allowReattempts: assignment.allow_reattempts !== false,
+        leaderboardEnabled: assignment.leaderboard_enabled !== false,
+        solutionsReleasePolicy: jsonObject(assignment.solutions_release_policy)
+    };
+}
+
+function formatAttempt(a) {
+    return {
+        id: a.id,
+        testId: a.test_id,
+        testAssignmentId: a.test_assignment_id,
+        assignmentId: a.test_assignment_id,
+        studentId: a.student_id,
+        studentName: a.student_name,
+        score: a.score ? Number(a.score) : 0,
+        maxScore: a.max_score ? Number(a.max_score) : 0,
+        accuracy: a.accuracy ? Number(a.accuracy) : 0,
+        timeTaken: a.time_taken,
+        answers: a.answers || {},
+        status: a.status || {},
+        timeSpent: a.time_spent || {},
+        questionKeys: a.question_keys || {},
+        subjectScores: a.subject_scores || {},
+        result: a.status?.pdf2cbtResult,
+        isSubmitted: a.is_submitted !== false,
+        timestamp: new Date(a.created_at).getTime()
+    };
+}
+
+async function ensureAssignment({ testId, batchId, audienceType, schedule, createdBy, status, allowReattempts, leaderboardEnabled, solutionsReleasePolicy }) {
+    const finalAudienceType = normalizeAudienceType(audienceType, batchId);
+    const finalBatchId = finalAudienceType === AUDIENCE_TYPE.FREE ? null : batchId;
+
+    const existing = await prisma.testAssignments.findFirst({
+        where: {
+            test_id: testId,
+            audience_type: finalAudienceType,
+            batch_id: finalBatchId
+        }
+    });
+
+    const data = {
+        status: normalizeAssignmentStatus(status),
+        schedule: schedule || {},
+        allow_reattempts: allowReattempts !== false,
+        leaderboard_enabled: leaderboardEnabled !== false,
+        solutions_release_policy: solutionsReleasePolicy || {},
+        created_by: createdBy
+    };
+
+    if (existing) {
+        return prisma.testAssignments.update({
+            where: { id: existing.id },
+            data
+        });
+    }
+
+    return prisma.testAssignments.create({
+        data: {
+            id: randomUUID(),
+            test_id: testId,
+            audience_type: finalAudienceType,
+            batch_id: finalBatchId,
+            ...data
+        }
+    });
+}
 
 function estimateJsonSizeBytes(value) {
     try {
@@ -88,10 +202,44 @@ function countPdf2CbtQuestions(testData) {
     }, 0);
 }
 
+/**
+ * Compute question_count for a test payload.
+ * PDF2CBT: traverse subject->section->question keys in testInterfaceData.
+ * Legacy:  use config.sections[].questionIndices lengths (cheap), or fall back
+ *          to questions array length.
+ */
+function computeQuestionCount(payload) {
+    const isV2 = isPdf2CbtV2Payload(payload);
+
+    if (isV2) {
+        // pdfCropperData.boxes is the authoritative flat list in v2 tests
+        const boxes = payload.config?.pdfCropperData?.boxes;
+        if (Array.isArray(boxes) && boxes.length > 0) {
+            return boxes.filter(b => b.kind === 'question').length;
+        }
+        // Fall back to traversing testInterfaceData/questions JSON
+        const testData = payload.questions ?? payload.testInterfaceData ?? payload.testData;
+        return countPdf2CbtQuestions(testData);
+    }
+
+    // Legacy tests: config.sections is always present and tiny
+    const config = payload.config && typeof payload.config === 'object' ? payload.config : {};
+    if (Array.isArray(config.sections) && config.sections.length > 0) {
+        return config.sections.reduce((total, sec) => {
+            return total + (Array.isArray(sec.questionIndices) ? sec.questionIndices.length : 0);
+        }, 0);
+    }
+
+    // Final fallback: count the questions array directly
+    const questions = payload.questions;
+    return Array.isArray(questions) ? questions.length : 0;
+}
+
 function validatePdf2CbtPayload({ name, config, testData, answerKey, durationMinutes, payload }) {
     const errors = [];
     const questionCount = countPdf2CbtQuestions(testData);
     const payloadSize = estimateJsonSizeBytes(payload);
+    const isDraft = (payload?.status === "DRAFT") || (payload?.status === "draft");
 
     if (!name || !`${name}`.trim()) {
         errors.push("Test name is required.");
@@ -101,27 +249,29 @@ function validatePdf2CbtPayload({ name, config, testData, answerKey, durationMin
         errors.push("Invalid PDF2CBT config metadata.");
     }
 
-    if (!testData || typeof testData !== "object" || questionCount === 0) {
-        errors.push("PDF2CBT test data must contain at least one question.");
-    }
+    if (!isDraft) {
+        if (!testData || typeof testData !== "object" || questionCount === 0) {
+            errors.push("PDF2CBT test data must contain at least one question.");
+        }
 
-    if (!answerKey || typeof answerKey !== "object") {
-        errors.push("PDF2CBT answer key payload is invalid.");
-    }
+        if (!answerKey || typeof answerKey !== "object") {
+            errors.push("PDF2CBT answer key payload is invalid.");
+        }
 
-    if (!Number.isFinite(Number(durationMinutes)) || Number(durationMinutes) <= 0 || Number(durationMinutes) > 720) {
-        errors.push("Duration minutes must be between 1 and 720.");
-    }
+        if (!Number.isFinite(Number(durationMinutes)) || Number(durationMinutes) <= 0 || Number(durationMinutes) > 720) {
+            errors.push("Duration minutes must be between 1 and 720.");
+        }
 
-    if (questionCount > MAX_V2_QUESTION_COUNT) {
-        errors.push(`PDF2CBT test exceeds the supported question limit of ${MAX_V2_QUESTION_COUNT}.`);
+        if (questionCount > MAX_V2_QUESTION_COUNT) {
+            errors.push(`PDF2CBT test exceeds the supported question limit of ${MAX_V2_QUESTION_COUNT}.`);
+        }
     }
 
     if (payloadSize > MAX_V2_TEST_PAYLOAD_BYTES) {
         errors.push("PDF2CBT payload is too large. Reduce embedded images or split the test.");
     }
 
-    if (testData && answerKey && typeof testData === "object" && typeof answerKey === "object") {
+    if (!isDraft && testData && answerKey && typeof testData === "object" && typeof answerKey === "object") {
         for (const [subject, subjectData] of Object.entries(testData)) {
             for (const [section, sectionData] of Object.entries(subjectData || {})) {
                 for (const [questionKey, questionData] of Object.entries(sectionData || {})) {
@@ -353,12 +503,53 @@ async function recalculateAllPdf2CbtAttempts(testId, answerKey, testData) {
  */
 router.get("/free", requireAuth, async (req, res) => {
     try {
-        const data = await prisma.tests.findMany({
-            where: { is_free: true },
+        const isMetaOnly = req.query.meta_only === 'true';
+        const testSelect = isMetaOnly
+            ? {
+                id: true, name: true, created_at: true, batch_id: true,
+                is_free: true, schedule: true, config: true, duration_minutes: true,
+                test_type: true, tags: true, status: true, question_count: true
+            }
+            : true;
+
+        // Fetch tests assigned to FREE audience (must be PUBLISHED + assignment ACTIVE)
+        const assignments = await prisma.testAssignments.findMany({
+            where: {
+                audience_type: AUDIENCE_TYPE.FREE,
+                status: ASSIGNMENT_STATUS.ACTIVE,
+                test: { status: TEST_STATUS.PUBLISHED }
+            },
+            include: { test: testSelect === true ? true : { select: testSelect } },
             orderBy: { created_at: 'desc' }
         });
 
-        res.json(data || []);
+        // Fetch tests flagged is_free=true directly — do NOT filter by PUBLISHED
+        // because toggle-free may have been used without explicitly publishing the test.
+        // Exclude ARCHIVED tests only.
+        const freeTests = await prisma.tests.findMany({
+            where: {
+                is_free: true,
+                status: { not: TEST_STATUS.ARCHIVED }
+            },
+            select: testSelect === true ? undefined : testSelect,
+            orderBy: { created_at: 'desc' }
+        });
+
+        const assignedFreeTests = (assignments || []).map(a => formatAssignmentTest(a.test, a));
+        const assignedTestIds = new Set(assignedFreeTests.map(t => t.id));
+        
+        const additionalFreeTests = freeTests
+            .filter(t => !assignedTestIds.has(t.id))
+            .map(t => ({
+                ...t,
+                is_free: true,
+                audienceType: AUDIENCE_TYPE.FREE,
+                assignmentStatus: ASSIGNMENT_STATUS.ACTIVE,
+                allowReattempts: true,
+                leaderboardEnabled: true
+            }));
+
+        res.json([...assignedFreeTests, ...additionalFreeTests].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (err) {
         console.error("GET FREE TESTS ERROR:", err);
         res.status(500).json({ error: "Failed to fetch free tests" });
@@ -366,25 +557,222 @@ router.get("/free", requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /tests/assignments
+ * Admin/teacher: list assignments, optionally by test or batch.
+ */
+router.get("/assignments", requireAuth, requireTeacher, async (req, res) => {
+    const { testId, batchId, audienceType, status } = req.query;
+    try {
+        const where = {};
+        if (testId) where.test_id = testId;
+        if (batchId) where.batch_id = batchId;
+        if (audienceType) where.audience_type = `${audienceType}`.toUpperCase();
+        if (status) where.status = `${status}`.toUpperCase();
+
+        const assignments = await prisma.testAssignments.findMany({
+            where,
+            include: {
+                test: { select: { id: true, name: true, status: true, test_type: true, tags: true } },
+                batch: { select: { id: true, title: true } }
+            },
+            orderBy: { created_at: "desc" }
+        });
+        res.json(assignments || []);
+    } catch (err) {
+        console.error("GET ASSIGNMENTS ERROR:", err);
+        res.status(500).json({ error: "Failed to fetch test assignments" });
+    }
+});
+
+/**
+ * POST /tests/:id/assignments
+ * Admin/teacher: assign a global test to a batch or free audience.
+ */
+router.post("/:id/assignments", requireAuth, requireTeacher, async (req, res) => {
+    const { id } = req.params;
+    const {
+        batchId,
+        batch_id,
+        audienceType,
+        audience_type,
+        schedule,
+        status,
+        allowReattempts,
+        allow_reattempts,
+        leaderboardEnabled,
+        leaderboard_enabled,
+        solutionsReleasePolicy,
+        solutions_release_policy
+    } = req.body;
+
+    try {
+        const test = await prisma.tests.findUnique({ where: { id }, select: { id: true } });
+        if (!test) return res.status(404).json({ error: "Test not found" });
+
+        const assignment = await ensureAssignment({
+            testId: id,
+            batchId: batch_id || batchId,
+            audienceType: audience_type || audienceType,
+            schedule,
+            status,
+            allowReattempts: allow_reattempts ?? allowReattempts,
+            leaderboardEnabled: leaderboard_enabled ?? leaderboardEnabled,
+            solutionsReleasePolicy: solutions_release_policy || solutionsReleasePolicy,
+            createdBy: req.user.id
+        });
+
+        await prisma.tests.update({
+            where: { id },
+            data: { status: TEST_STATUS.PUBLISHED }
+        });
+
+        res.json(assignment);
+    } catch (err) {
+        console.error("CREATE ASSIGNMENT ERROR:", err);
+        res.status(500).json({ error: "Failed to assign test" });
+    }
+});
+
+router.get("/:id/assignments", requireAuth, requireTeacher, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const assignments = await prisma.testAssignments.findMany({
+            where: { test_id: id },
+            include: { batch: { select: { id: true, title: true } } },
+            orderBy: { created_at: "desc" }
+        });
+        res.json(assignments || []);
+    } catch (err) {
+        console.error("GET TEST ASSIGNMENTS ERROR:", err);
+        res.status(500).json({ error: "Failed to fetch test assignments" });
+    }
+});
+
+router.patch("/:id/status", requireAuth, requireTeacher, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const data = await prisma.tests.update({
+            where: { id },
+            data: { status: normalizeStatus(req.body.status, TEST_STATUS.DRAFT) }
+        });
+        res.json(data);
+    } catch (err) {
+        console.error("UPDATE TEST STATUS ERROR:", err);
+        res.status(500).json({ error: "Failed to update test status" });
+    }
+});
+
+/**
+ * PUT /tests/assignments/:assignmentId
+ */
+router.put("/assignments/:assignmentId", requireAuth, requireTeacher, async (req, res) => {
+    const { assignmentId } = req.params;
+    const updateData = {};
+    if (req.body.status !== undefined) updateData.status = normalizeAssignmentStatus(req.body.status);
+    if (req.body.schedule !== undefined) updateData.schedule = req.body.schedule || {};
+    if (req.body.allowReattempts !== undefined || req.body.allow_reattempts !== undefined) updateData.allow_reattempts = req.body.allow_reattempts ?? req.body.allowReattempts;
+    if (req.body.leaderboardEnabled !== undefined || req.body.leaderboard_enabled !== undefined) updateData.leaderboard_enabled = req.body.leaderboard_enabled ?? req.body.leaderboardEnabled;
+    if (req.body.solutionsReleasePolicy !== undefined || req.body.solutions_release_policy !== undefined) updateData.solutions_release_policy = req.body.solutions_release_policy || req.body.solutionsReleasePolicy || {};
+
+    try {
+        const assignment = await prisma.testAssignments.update({
+            where: { id: assignmentId },
+            data: updateData
+        });
+        res.json(assignment);
+    } catch (err) {
+        console.error("UPDATE ASSIGNMENT ERROR:", err);
+        res.status(500).json({ error: "Failed to update test assignment" });
+    }
+});
+
+/**
+ * DELETE /tests/assignments/:assignmentId
+ * Archive an assignment without deleting the global test.
+ */
+router.delete("/assignments/:assignmentId", requireAuth, requireTeacher, async (req, res) => {
+    const { assignmentId } = req.params;
+    try {
+        await prisma.testAssignments.update({
+            where: { id: assignmentId },
+            data: { status: ASSIGNMENT_STATUS.ARCHIVED }
+        });
+        res.json({ success: true });
+    } catch (err) {
+        console.error("DELETE ASSIGNMENT ERROR:", err);
+        res.status(500).json({ error: "Failed to archive test assignment" });
+    }
+});
+
+router.get("/assignments/:assignmentId/leaderboard", requireAuth, async (req, res) => {
+    const { assignmentId } = req.params;
+    try {
+        const data = await prisma.testAttempts.findMany({
+            where: { test_assignment_id: assignmentId },
+            orderBy: [{ score: "desc" }, { time_taken: "asc" }]
+        });
+        const leaderboard = (data || [])
+            .filter(a => a.is_submitted !== false && a.status?.is_submitted !== false)
+            .map((a, idx) => ({ rank: idx + 1, ...formatAttempt(a) }));
+        res.json(leaderboard);
+    } catch (err) {
+        console.error("GET ASSIGNMENT LEADERBOARD ERROR:", err);
+        res.status(500).json({ error: "Failed to fetch assignment leaderboard" });
+    }
+});
+
+/**
  * GET /tests
- * Get tests for a batch (supports is_free filter)
+ * Get global tests, or assigned tests when batchId/is_free filters are supplied.
  */
 router.get("/", requireAuth, async (req, res) => {
-    const { batch, batchId, is_free } = req.query;
+    const { batch, batchId, is_free, status, assigned } = req.query;
     const targetBatchId = batch || batchId;
 
     try {
-        const whereClause = {};
+        if (targetBatchId || is_free === "true") {
+            const whereAssignment = {
+                status: ASSIGNMENT_STATUS.ACTIVE,
+                test: { status: TEST_STATUS.PUBLISHED }
+            };
+            if (targetBatchId) {
+                whereAssignment.audience_type = AUDIENCE_TYPE.BATCH;
+                whereAssignment.batch_id = targetBatchId;
+            }
+            if (is_free === "true") {
+                whereAssignment.audience_type = AUDIENCE_TYPE.FREE;
+            }
 
-        if (targetBatchId) {
-            whereClause.batch_id = targetBatchId;
+            const isMetaOnly = req.query.meta_only === 'true';
+            const testSelect = isMetaOnly
+                ? {
+                    id: true, name: true, created_at: true, batch_id: true,
+                    is_free: true, schedule: true, config: true, duration_minutes: true,
+                    test_type: true, tags: true, status: true, question_count: true
+                }
+                : true; // true = include all fields
+
+            const assignments = await prisma.testAssignments.findMany({
+                where: whereAssignment,
+                include: { test: testSelect === true ? true : { select: testSelect } },
+                orderBy: { created_at: "desc" }
+            });
+
+            return res.json((assignments || []).map(a => formatAssignmentTest(a.test, a)));
         }
 
-        // Support is_free filter
-        if (is_free === 'true') {
-            whereClause.is_free = true;
-        } else if (is_free === 'false') {
-            whereClause.is_free = false;
+        const whereClause = {};
+
+        if (status) {
+            whereClause.status = `${status}`.toUpperCase();
+        } else if (req.user.role !== "ADMIN" && req.user.role !== "TEACHER") {
+            whereClause.status = TEST_STATUS.PUBLISHED;
+        }
+
+        if (assigned === "false") {
+            whereClause.testAssignments = { none: {} };
+        } else if (assigned === "true") {
+            whereClause.testAssignments = { some: {} };
         }
 
         // Support meta_only filter
@@ -392,13 +780,18 @@ router.get("/", requireAuth, async (req, res) => {
             ? {
                 id: true, name: true, created_at: true, batch_id: true,
                 is_free: true, schedule: true, config: true, duration_minutes: true,
-                test_type: true, tags: true
+                test_type: true, tags: true, status: true, question_count: true
             }
             : undefined;
 
         const data = await prisma.tests.findMany({
             where: whereClause,
             select: selectClause,
+            include: selectClause ? undefined : {
+                testAssignments: {
+                    include: { batch: { select: { id: true, title: true } } }
+                }
+            },
             orderBy: { created_at: 'desc' }
         });
 
@@ -415,35 +808,44 @@ router.get("/", requireAuth, async (req, res) => {
  */
 router.get("/attempts/me", requireAuth, async (req, res) => {
     try {
+        const isMetaOnly = req.query.meta_only === 'true';
+
         const data = await prisma.testAttempts.findMany({
             where: { student_id: req.user.id },
+            select: isMetaOnly ? {
+                id: true, test_id: true, test_assignment_id: true, student_id: true,
+                student_name: true, score: true, max_score: true, accuracy: true,
+                time_taken: true, is_submitted: true, created_at: true
+            } : undefined,
             orderBy: { created_at: 'desc' }
         });
 
-        // Transform to frontend format
-        const attempts = (data || []).map(a => ({
-            id: a.id,
-            testId: a.test_id,
-            studentId: a.student_id,
-            studentName: a.student_name,
-            score: a.score ? Number(a.score) : 0,
-            maxScore: a.max_score ? Number(a.max_score) : 0,
-            accuracy: a.accuracy ? Number(a.accuracy) : 0,
-            timeTaken: a.time_taken,
-            answers: a.answers || {},
-            status: a.status || {},
-            timeSpent: a.time_spent || {},
-            questionKeys: a.question_keys || {},
-            subjectScores: a.subject_scores || {},
-            result: a.status?.pdf2cbtResult,
-            isSubmitted: a.is_submitted !== false,
-            timestamp: new Date(a.created_at).getTime()
-        }));
-
-        res.json(attempts);
+        res.json((data || []).map(formatAttempt));
     } catch (err) {
         console.error("GET MY ATTEMPTS ERROR:", err);
         res.status(500).json({ error: "Failed to fetch attempts" });
+    }
+});
+
+/**
+ * GET /tests/attempts/:attemptId
+ * Get a specific attempt for current student
+ */
+router.get("/attempts/:attemptId", requireAuth, async (req, res) => {
+    try {
+        const data = await prisma.testAttempts.findUnique({
+            where: { id: req.params.attemptId }
+        });
+
+        if (!data) return res.status(404).json({ error: "Attempt not found" });
+        if (data.student_id !== req.user.id && req.user.role === 'STUDENT') {
+            return res.status(403).json({ error: "Not authorized" });
+        }
+
+        res.json(formatAttempt(data));
+    } catch (err) {
+        console.error("GET ATTEMPT ERROR:", err);
+        res.status(500).json({ error: "Failed to fetch attempt" });
     }
 });
 
@@ -534,8 +936,8 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
     const finalBatchId = batch_id || batchId;
     const finalName = name || title;
 
-    if (!finalBatchId || !finalName) {
-        return res.status(400).json({ error: "batch_id and name are required" });
+    if (!finalName) {
+        return res.status(400).json({ error: "name is required" });
     }
 
     try {
@@ -546,7 +948,9 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         const finalAnswerKey = isV2Test
             ? (providedAnswerKey || {})
             : extractAnswerKey(questions);
-        const isFree = finalBatchId === 'free-tests';
+        const shouldCreateAssignment = !!finalBatchId;
+        const isFree = finalBatchId === FREE_TESTS_BATCH_ID;
+        const finalStatus = shouldCreateAssignment ? TEST_STATUS.PUBLISHED : normalizeStatus(req.body.status, TEST_STATUS.DRAFT);
 
         if (isV2Test) {
             const validationErrors = validatePdf2CbtPayload({
@@ -564,7 +968,7 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
         }
 
         const insertData = {
-            batch_id: isFree ? null : finalBatchId,
+            batch_id: null,
             name: finalName,
             config: finalConfig,
             schedule: schedule || {},
@@ -573,13 +977,33 @@ router.post("/", requireAuth, requireTeacher, async (req, res) => {
             duration_minutes: getDurationMinutes(req.body, finalConfig),
             tags: tags || [],
             created_by: req.user.id,
-            is_free: isFree,
-            test_type: test_type || 'FULL_SYLLABUS'
+            is_free: false,
+            test_type: test_type || 'FULL_SYLLABUS',
+            status: finalStatus,
+            question_count: computeQuestionCount(req.body)
         };
 
         const data = await prisma.tests.create({
             data: insertData
         });
+
+        if (shouldCreateAssignment) {
+            const assignment = await prisma.testAssignments.create({
+                data: {
+                    id: randomUUID(),
+                    test_id: data.id,
+                    audience_type: isFree ? AUDIENCE_TYPE.FREE : AUDIENCE_TYPE.BATCH,
+                    batch_id: isFree ? null : finalBatchId,
+                    status: ASSIGNMENT_STATUS.ACTIVE,
+                    schedule: schedule || {},
+                    allow_reattempts: true,
+                    leaderboard_enabled: true,
+                    solutions_release_policy: {},
+                    created_by: req.user.id
+                }
+            });
+            return res.json(formatAssignmentTest(data, assignment));
+        }
 
         res.json(data);
     } catch (err) {
@@ -599,13 +1023,14 @@ router.post("/import", requireAuth, requireTeacher, async (req, res) => {
     // Handle both new format (wrapped in .test) and legacy format (flat object)
     const importSource = testData?.test || testData;
 
-    if (!finalBatchId || !importSource) {
-        return res.status(400).json({ error: "batch_id and valid testData are required" });
+    if (!importSource) {
+        return res.status(400).json({ error: "valid testData is required" });
     }
 
     try {
         const imported = importSource;
-        const isFree = finalBatchId === 'free-tests';
+        const shouldCreateAssignment = !!finalBatchId;
+        const isFree = finalBatchId === FREE_TESTS_BATCH_ID;
         const isV2Test = isPdf2CbtV2Payload(imported);
         const finalConfig = isV2Test ? normalizeV2Config(imported) : (imported.config || {});
         const finalQuestions = isV2Test ? (getProvidedTestData(imported) || {}) : (imported.questions || []);
@@ -631,7 +1056,7 @@ router.post("/import", requireAuth, requireTeacher, async (req, res) => {
         }
 
         const insertData = {
-            batch_id: isFree ? null : finalBatchId,
+            batch_id: null,
             name: imported.name || "Imported Test",
             config: finalConfig,
             schedule: imported.schedule || {},
@@ -640,13 +1065,33 @@ router.post("/import", requireAuth, requireTeacher, async (req, res) => {
             duration_minutes: getDurationMinutes(imported, finalConfig),
             tags: imported.tags || [],
             created_by: req.user.id,
-            is_free: isFree,
-            test_type: imported.test_type || 'FULL_SYLLABUS'
+            is_free: false,
+            test_type: imported.test_type || 'FULL_SYLLABUS',
+            status: shouldCreateAssignment ? TEST_STATUS.PUBLISHED : normalizeStatus(imported.status, TEST_STATUS.DRAFT),
+            question_count: computeQuestionCount(imported)
         };
 
         const data = await prisma.tests.create({
             data: insertData
         });
+
+        if (shouldCreateAssignment) {
+            const assignment = await prisma.testAssignments.create({
+                data: {
+                    id: randomUUID(),
+                    test_id: data.id,
+                    audience_type: isFree ? AUDIENCE_TYPE.FREE : AUDIENCE_TYPE.BATCH,
+                    batch_id: isFree ? null : finalBatchId,
+                    status: ASSIGNMENT_STATUS.ACTIVE,
+                    schedule: imported.schedule || {},
+                    allow_reattempts: true,
+                    leaderboard_enabled: true,
+                    solutions_release_policy: {},
+                    created_by: req.user.id
+                }
+            });
+            return res.json(formatAssignmentTest(data, assignment));
+        }
 
         res.json(data);
     } catch (err) {
@@ -661,10 +1106,33 @@ router.post("/import", requireAuth, requireTeacher, async (req, res) => {
  */
 router.get("/:id/leaderboard", requireAuth, async (req, res) => {
     const { id } = req.params;
+    const { assignmentId, testAssignmentId } = req.query;
+    const finalAssignmentId = assignmentId || testAssignmentId;
 
     try {
+        let testIdsToQuery = [id];
+
+        // If no specific assignment is requested (e.g. from Test Center for a global test),
+        // we should also include attempts from any legacy copies of this test.
+        // Legacy tests were copied entirely, so they have different test_ids but the same name.
+        if (!finalAssignmentId) {
+            const test = await prisma.tests.findUnique({ where: { id }, select: { name: true } });
+            if (test && test.name) {
+                const copies = await prisma.tests.findMany({ 
+                    where: { name: test.name },
+                    select: { id: true }
+                });
+                if (copies.length > 0) {
+                    testIdsToQuery = copies.map(c => c.id);
+                }
+            }
+        }
+
         const data = await prisma.testAttempts.findMany({
-            where: { test_id: id },
+            where: {
+                test_id: { in: testIdsToQuery },
+                ...(finalAssignmentId ? { test_assignment_id: finalAssignmentId } : {})
+            },
             orderBy: [
                 { score: 'desc' },
                 { time_taken: 'asc' }
@@ -680,16 +1148,8 @@ router.get("/:id/leaderboard", requireAuth, async (req, res) => {
 
         const leaderboard = submittedAttempts.map((a, idx) => ({
             rank: idx + 1,
-            id: a.id,
-            studentId: a.student_id,
-            studentName: a.student_name || 'Anonymous',
-            score: a.score ? Number(a.score) : 0,
-            maxScore: a.max_score ? Number(a.max_score) : 0,
-            accuracy: a.accuracy ? Number(a.accuracy) : 0,
-            timeTaken: a.time_taken || 0,
-            subjectScores: a.subject_scores || {},
-            result: a.status?.pdf2cbtResult,
-            timestamp: new Date(a.created_at).getTime()
+            ...formatAttempt(a),
+            studentName: a.student_name || 'Anonymous'
         }));
 
         res.json(leaderboard);
@@ -721,12 +1181,29 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
         question_keys,
         subjectScores,
         subject_scores,
-        isSubmitted
+        isSubmitted,
+        assignmentId,
+        testAssignmentId,
+        test_assignment_id
     } = req.body;
 
     const finalIsSubmitted = isSubmitted !== false; // defaults to true if undefined
+    const finalAssignmentId = test_assignment_id || testAssignmentId || assignmentId || null;
 
     try {
+        if (finalAssignmentId) {
+            const assignment = await prisma.testAssignments.findUnique({
+                where: { id: finalAssignmentId },
+                select: { id: true, test_id: true, status: true }
+            });
+            if (!assignment || assignment.test_id !== id) {
+                return res.status(404).json({ error: "Test assignment not found" });
+            }
+            if (assignment.status !== ASSIGNMENT_STATUS.ACTIVE) {
+                return res.status(403).json({ error: "Test assignment is not active" });
+            }
+        }
+
         const testData = await prisma.tests.findUnique({
             where: { id },
             select: { config: true, answer_key: true, questions: true }
@@ -750,6 +1227,7 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
         const existingAttempts = await prisma.testAttempts.findMany({
             where: {
                 test_id: id,
+                ...(finalAssignmentId ? { test_assignment_id: finalAssignmentId } : {}),
                 student_id: req.user.id,
                 is_submitted: false
             },
@@ -760,12 +1238,12 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
 
         const unsubmittedAttempt = existingAttempts?.[0] || null;
 
-        const statusObj = status || {};
+        const statusObj = { ...(status || {}) };
         statusObj.is_submitted = finalIsSubmitted;
         const timeSpentObj = timeSpent || time_spent || {};
-        let finalScore = score || 0;
-        let finalMaxScore = maxScore || max_score || 0;
-        let finalAccuracy = accuracy || 0;
+        let finalScore = score ?? 0;
+        let finalMaxScore = maxScore ?? max_score ?? 0;
+        let finalAccuracy = accuracy ?? 0;
         let finalSubjectScores = subjectScores || subject_scores || {};
 
         if (isV2Test) {
@@ -786,6 +1264,7 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
 
         const payload = {
             test_id: id,
+            test_assignment_id: finalAssignmentId,
             student_id: req.user.id,
             student_name: studentName,
             score: finalScore,
@@ -814,24 +1293,7 @@ router.post("/:id/attempts", requireAuth, async (req, res) => {
             });
         }
 
-        res.json({
-            id: data.id,
-            testId: data.test_id,
-            studentId: data.student_id,
-            studentName: data.student_name,
-            score: data.score ? Number(data.score) : 0,
-            maxScore: data.max_score ? Number(data.max_score) : 0,
-            accuracy: data.accuracy ? Number(data.accuracy) : 0,
-            timeTaken: data.time_taken,
-            answers: data.answers || {},
-            status: data.status || {},
-            timeSpent: data.time_spent || {},
-            questionKeys: data.question_keys || {},
-            subjectScores: data.subject_scores || {},
-            result: data.status?.pdf2cbtResult,
-            isSubmitted: data.is_submitted !== false,
-            timestamp: new Date(data.created_at).getTime()
-        });
+        res.json(formatAttempt(data));
     } catch (err) {
         console.error("SUBMIT ATTEMPT ERROR:", err);
         res.status(500).json({ error: "Failed to submit attempt" });
@@ -951,6 +1413,7 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
         if (req.body.schedule !== undefined) updateData.schedule = req.body.schedule;
         if (req.body.tags !== undefined) updateData.tags = req.body.tags;
         if (req.body.test_type !== undefined) updateData.test_type = req.body.test_type;
+        if (req.body.status !== undefined) updateData.status = normalizeStatus(req.body.status);
         if (req.body.duration_minutes !== undefined || req.body.durationMinutes !== undefined)
             updateData.duration_minutes = req.body.duration_minutes || req.body.durationMinutes;
 
@@ -996,6 +1459,15 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
                 const result = await recalculateAllPdf2CbtAttempts(id, providedAnswerKey, existingV2Test?.questions || {});
                 attemptsRecalculated = result.updated;
             }
+        }
+
+        // Always update question_count when questions or config are being written
+        if (updateData.questions !== undefined || updateData.config !== undefined) {
+            updateData.question_count = computeQuestionCount({
+                ...req.body,
+                config: updateData.config ?? req.body.config,
+                questions: updateData.questions ?? req.body.questions
+            });
         }
 
         if (isV2Test) {
@@ -1052,37 +1524,57 @@ router.delete("/:id", requireAuth, requireTeacher, async (req, res) => {
             return res.status(404).json({ error: "Test not found" });
         }
 
-        await prisma.$transaction(async (tx) => {
-            const bookmarks = await tx.bookmarks.findMany({
-                where: { test_id: id },
-                select: { id: true }
-            });
-
-            const bookmarkIds = bookmarks.map((bookmark) => bookmark.id);
-
-            if (bookmarkIds.length > 0) {
-                await tx.bookmarkTagRelations.deleteMany({
-                    where: { bookmark_id: { in: bookmarkIds } }
-                });
-            }
-
-            await tx.bookmarks.deleteMany({
+        await prisma.$transaction([
+            prisma.bookmarkTagRelations.deleteMany({
+                where: { bookmark: { test_id: id } }
+            }),
+            prisma.bookmarks.deleteMany({
                 where: { test_id: id }
-            });
-
-            await tx.testAttempts.deleteMany({
+            }),
+            prisma.testAttempts.deleteMany({
                 where: { test_id: id }
-            });
-
-            await tx.tests.delete({
+            }),
+            prisma.testAssignments.deleteMany({
+                where: { test_id: id }
+            }),
+            prisma.tests.delete({
                 where: { id }
-            });
-        });
+            })
+        ]);
 
         res.json({ success: true });
     } catch (err) {
         console.error("DELETE TEST ERROR:", err);
         res.status(500).json({ error: "Failed to delete test" });
+    }
+});
+
+/**
+ * @route   PATCH /tests/:id/toggle-free
+ * @desc    Toggle is_free flag on a test
+ * @access  Private (Admin only)
+ */
+router.patch("/:id/toggle-free", requireAuth, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { isFree } = req.body;
+    
+    try {
+        const updateData = { is_free: Boolean(isFree) };
+        // Auto-publish the test when marking it as free so it appears on the free tests page.
+        // When un-marking, we leave the status as-is (admin can archive/unpublish separately).
+        if (Boolean(isFree)) {
+            updateData.status = TEST_STATUS.PUBLISHED;
+        }
+
+        const test = await prisma.tests.update({
+            where: { id },
+            data: updateData
+        });
+        
+        res.json({ success: true, is_free: test.is_free, status: test.status });
+    } catch (err) {
+        console.error("TOGGLE FREE ERROR:", err);
+        res.status(500).json({ error: "Failed to toggle test free status" });
     }
 });
 

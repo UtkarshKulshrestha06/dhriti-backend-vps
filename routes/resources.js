@@ -2,13 +2,19 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const multer = require("multer");
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../services/prisma");
 const { requireAuth, requireTeacher } = require("../middleware/auth");
 
 const { uploadFile, deleteFile } = require("../services/ftpService");
 
-const prisma = new PrismaClient();
-
+const formatBytes = (bytes, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
 // Multer Memory Storage (since we are on Render and uploading via FTP)
 const storage = multer.memoryStorage();
 
@@ -78,10 +84,12 @@ router.get("/", requireAuth, async (req, res) => {
             subjectId: r.subject_id,
             subjectName: r.subject?.name || "",
             batchId: r.batch_id,
+            stream: r.stream || "General",
             title: r.title,
             type: r.type,
             url: r.file_url,
             fileSize: r.file_size ? Number(r.file_size) : null,
+            size: r.file_size ? formatBytes(Number(r.file_size)) : "PDF",
             uploadDate: r.created_at,
             uploadedBy: r.uploaded_by,
             isFree: r.is_free,
@@ -111,7 +119,8 @@ router.post(
                 chapter_id,
                 chapterId,
                 title,
-                type
+                type,
+                stream
             } = req.body;
 
             const finalBatchId = batch_id || batchId;
@@ -184,6 +193,7 @@ router.post(
                         batch_id: validBatchId,
                         subject_id: validSubjectId,
                         chapter_id: validChapterId,
+                        stream: stream || (validBatchId ? (await prisma.batches.findUnique({ where: { id: validBatchId }, include: { stream: true } }))?.stream?.title || "General" : "General"),
                         title,
                         type,
                         file_url: publicUrl,
@@ -197,10 +207,12 @@ router.post(
                     chapterId: data.chapter_id,
                     subjectId: data.subject_id,
                     batchId: data.batch_id,
+                    stream: data.stream,
                     title: data.title,
                     type: data.type,
                     url: data.file_url,
                     fileSize: Number(data.file_size),
+                    size: data.file_size ? formatBytes(Number(data.file_size)) : "PDF",
                     uploadDate: data.created_at,
                     isNew: true
                 });
@@ -227,14 +239,36 @@ router.post(
  */
 router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
     const { id } = req.params;
-    const { title, type, is_free, isFree } = req.body;
+    const { title, type, is_free, isFree, stream, subject } = req.body;
 
     try {
         const updateData = {};
         if (title !== undefined) updateData.title = title;
         if (type !== undefined) updateData.type = type;
+        if (stream !== undefined) updateData.stream = stream;
         if (is_free !== undefined || isFree !== undefined) {
             updateData.is_free = is_free ?? isFree;
+        }
+
+        if (subject !== undefined) {
+            const existingResource = await prisma.resources.findUnique({ where: { id } });
+            if (existingResource && existingResource.batch_id) {
+                let newSubjectId = null;
+                if (subject) {
+                    let subjectData = await prisma.subjects.findFirst({
+                        where: { batch_id: existingResource.batch_id, name: subject },
+                        select: { id: true }
+                    });
+                    if (!subjectData) {
+                        subjectData = await prisma.subjects.create({
+                            data: { batch_id: existingResource.batch_id, name: subject },
+                            select: { id: true }
+                        });
+                    }
+                    newSubjectId = subjectData.id;
+                }
+                updateData.subject_id = newSubjectId;
+            }
         }
 
         const data = await prisma.resources.update({
@@ -242,9 +276,11 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
             data: updateData
         });
 
+        const responseData = { ...data };
+        responseData.file_size = data.file_size ? Number(data.file_size) : null;
         res.json({
-            ...data,
-            fileSize: data.file_size ? Number(data.file_size) : null
+            ...responseData,
+            fileSize: responseData.file_size
         });
     } catch (err) {
         console.error("UPDATE RESOURCE ERROR:", err);

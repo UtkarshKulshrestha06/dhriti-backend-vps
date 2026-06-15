@@ -3,6 +3,8 @@ const Cache = new Map();
 const CACHE_TTL = {
   STREAMS: 5 * 60 * 1000,
   BATCHES: 5 * 60 * 1000,
+  SITE_CONTENT: 10 * 60 * 1000,
+  AUTH_ROLE: 2 * 60 * 1000,
 };
 
 const cache = {
@@ -25,6 +27,14 @@ const cache = {
     Cache.delete(key);
   },
   invalidatePrefix: (prefix) => {
+    for (const key of Cache.keys()) {
+      if (key.startsWith(prefix)) {
+        Cache.delete(key);
+      }
+    }
+  },
+  /** @deprecated Use invalidatePrefix instead */
+  invalidatePattern: (prefix) => {
     for (const key of Cache.keys()) {
       if (key.startsWith(prefix)) {
         Cache.delete(key);

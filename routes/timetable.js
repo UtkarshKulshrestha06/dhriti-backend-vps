@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../services/prisma");
 const { requireAuth, requireTeacher } = require("../middleware/auth");
 const { cache, CACHE_TTL } = require("../services/cache");
 const {
@@ -12,7 +12,6 @@ const {
     toDateOnly
 } = require("../services/dateTime");
 
-const prisma = new PrismaClient();
 
 // Helper: Get stream type for a batch
 async function getBatchStreamType(batchId) {
@@ -352,29 +351,10 @@ router.put("/:id", requireAuth, requireTeacher, async (req, res) => {
 });
 
 /**
- * DELETE /timetable/:id
- * Teacher+: Delete schedule entry
- */
-router.delete("/:id", requireAuth, requireTeacher, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        await prisma.timetable.delete({
-            where: { id }
-        });
-
-        cache.invalidatePattern('timetable:');
-        res.json({ success: true });
-    } catch (err) {
-        console.error("DELETE TIMETABLE ERROR:", err);
-        res.status(500).json({ error: "Failed to delete schedule entry" });
-    }
-});
-
-/**
  * DELETE /timetable/cleanup/old
  * Admin only: Delete timetable entries older than today
  * Can be called by cron job at midnight
+ * NOTE: This route MUST be defined BEFORE /:id to avoid Express matching "cleanup" as :id
  */
 router.delete("/cleanup/old", requireAuth, requireTeacher, async (req, res) => {
     try {
@@ -396,6 +376,26 @@ router.delete("/cleanup/old", requireAuth, requireTeacher, async (req, res) => {
     } catch (err) {
         console.error("CLEANUP TIMETABLE ERROR:", err);
         res.status(500).json({ error: "Failed to cleanup old entries" });
+    }
+});
+
+/**
+ * DELETE /timetable/:id
+ * Teacher+: Delete schedule entry
+ */
+router.delete("/:id", requireAuth, requireTeacher, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await prisma.timetable.delete({
+            where: { id }
+        });
+
+        cache.invalidatePattern('timetable:');
+        res.json({ success: true });
+    } catch (err) {
+        console.error("DELETE TIMETABLE ERROR:", err);
+        res.status(500).json({ error: "Failed to delete schedule entry" });
     }
 });
 

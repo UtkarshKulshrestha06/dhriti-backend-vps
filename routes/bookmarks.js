@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../services/prisma");
 const { requireAuth: verifyToken } = require('../middleware/auth');
 
-const prisma = new PrismaClient();
 
 // Helper to handle async route errors
 const asyncHandler = fn => (req, res, next) =>

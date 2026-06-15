@@ -2,13 +2,20 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const multer = require("multer");
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../services/prisma");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { cache, CACHE_TTL } = require("../services/cache");
 
 const { uploadFile, deleteFile } = require("../services/ftpService");
 
-const prisma = new PrismaClient();
+const formatBytes = (bytes, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
 
 // Multer Memory Storage
 const storage = multer.memoryStorage();
@@ -28,7 +35,7 @@ const FTP_BASE_PATH = process.env.FTP_BASE_PATH || "public_html/uploads";
 router.post("/upload", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
     try {
         const file = req.file;
-        const { title, subject, type } = req.body;
+        const { title, subject, stream, type } = req.body;
 
         if (!file || !title || !subject || !type) {
             return res.status(400).json({ error: "file, title, subject, and type are required" });
@@ -45,13 +52,23 @@ router.post("/upload", requireAuth, requireAdmin, upload.single("file"), async (
         await uploadFile(file.buffer, remotePath);
 
         try {
+            // Find subject ID
+            const subjectRecord = await prisma.subjects.findFirst({
+                where: { name: subject }
+            });
+            const subjectId = subjectRecord ? subjectRecord.id : null;
+
             // Save to DB
-            const data = await prisma.freebies.create({
+            const data = await prisma.resources.create({
                 data: {
+                    batch_id: "freebies",
+                    subject_id: subjectId,
+                    stream: stream || "General",
                     title,
-                    subject,
                     type,
-                    file_url: publicUrl
+                    file_url: publicUrl,
+                    file_size: file.size,
+                    is_free: true
                 }
             });
 
@@ -117,7 +134,8 @@ router.get("/", async (req, res) => {
             file_url: item.file_url,
             created_at: item.created_at,
             subject: item.subject?.name || "General",
-            size: "PDF",
+            stream: item.stream || "General",
+            size: item.file_size ? formatBytes(Number(item.file_size)) : "PDF",
             description: item.description || ""
         }));
 
@@ -134,19 +152,28 @@ router.get("/", async (req, res) => {
  * Admin: Create free resource (Link only)
  */
 router.post("/", requireAuth, requireAdmin, async (req, res) => {
-    const { title, subject, type, file_url, fileUrl } = req.body;
+    const { title, subject, stream, type, file_url, fileUrl } = req.body;
 
     if (!title || !subject || !type) {
         return res.status(400).json({ error: "title, subject, and type are required" });
     }
 
     try {
-        const data = await prisma.freebies.create({
+        // Find subject ID
+        const subjectRecord = await prisma.subjects.findFirst({
+            where: { name: subject }
+        });
+        const subjectId = subjectRecord ? subjectRecord.id : null;
+
+        const data = await prisma.resources.create({
             data: {
+                batch_id: "freebies",
+                subject_id: subjectId,
+                stream: stream || "General",
                 title,
-                subject,
                 type,
-                file_url: file_url || fileUrl
+                file_url: file_url || fileUrl,
+                is_free: true
             }
         });
 
@@ -167,20 +194,20 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
 
     try {
         // Fetch file URL first to delete from disk
-        const freebie = await prisma.freebies.findUnique({
+        const resource = await prisma.resources.findUnique({
             where: { id },
             select: { file_url: true }
         });
 
-        if (freebie && freebie.file_url && freebie.file_url.includes("/freebies/")) {
-            const fileName = freebie.file_url.split('/').pop();
+        if (resource && resource.file_url && resource.file_url.includes("/freebies/")) {
+            const fileName = resource.file_url.split('/').pop();
             if (fileName) {
                 const remotePath = `${FTP_BASE_PATH}/freebies/${fileName}`;
                 await deleteFile(remotePath).catch(e => console.error("FTP delete failed:", e));
             }
         }
 
-        await prisma.freebies.delete({
+        await prisma.resources.delete({
             where: { id }
         });
 

@@ -33,9 +33,12 @@ model User {
   siteContent   SiteContent[]
   testAttempts  TestAttempts[]
   tests         Tests[]
+  testAssignments TestAssignments[]
   notebooks     Notebooks[]
   questionTags  QuestionTags[]
   bookmarks     Bookmarks[]
+  quizzes       Quizzes[]
+  quizAttempts  QuizAttempts[]
 
   @@map("users")
 }
@@ -55,7 +58,6 @@ model Batches {
   id               String    @id
   stream_id        String?   @db.VarChar(36)
   title            String
-  subtitle         String?
   description      String?   @db.Text
   class_name       String?
   target_year      String?
@@ -64,10 +66,11 @@ model Batches {
   registration_fee String?
   batch_date       DateTime? @db.Date
   end_date         DateTime? @db.Date
-  syllabus_url     String?   @db.Text
-  image_url        String?   @db.Text
   color_theme      String?
   is_active        Boolean?  @default(true)
+  admissions_open  Boolean?  @default(true)
+  features         Json?
+  faculty          Json?
   created_at       DateTime? @default(now()) @db.DateTime(6)
 
   stream        Streams?        @relation(fields: [stream_id], references: [id])
@@ -77,6 +80,7 @@ model Batches {
   resources     Resources[]
   subjects      Subjects[]
   tests         Tests[]
+  testAssignments TestAssignments[]
   timetable     Timetable[]
 
   @@map("batches")
@@ -152,6 +156,7 @@ model Resources {
   batch_id    String?
   subject_id  String?   @db.VarChar(36)
   chapter_id  String?   @db.VarChar(36)
+  stream      String?   @db.VarChar(128)
   title       String
   type        String
   file_url    String    @db.Text
@@ -179,6 +184,23 @@ model SiteContent {
   @@map("site_content")
 }
 
+model YoutubeVideos {
+  id           String    @id @default(uuid()) @db.VarChar(36)
+  youtube_url  String    @db.Text
+  video_id     String    @unique @db.VarChar(32)
+  custom_title String?   @db.Text
+  youtube_title String   @db.Text
+  thumbnail_url String   @db.Text
+  channel_name String?   @db.VarChar(255)
+  duration     String?   @db.VarChar(32)
+  sort_order   Int       @default(0)
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now()) @db.DateTime(6)
+  updated_at   DateTime  @default(now()) @db.DateTime(6)
+
+  @@map("youtube_videos")
+}
+
 model Tests {
   id               String    @id @default(uuid()) @db.VarChar(36)
   batch_id         String?
@@ -193,23 +215,51 @@ model Tests {
   answer_key       Json?     @default("{}")
   is_free          Boolean?  @default(false)
   test_type        String?   @default("FULL_SYLLABUS")
+  status           String?   @default("DRAFT")
+  updated_at       DateTime? @default(now()) @db.DateTime(6)
+  question_count   Int?      @default(0)
 
+  batch           Batches?          @relation(fields: [batch_id], references: [id])
+  user            User?             @relation(fields: [created_by], references: [id])
+  testAttempts    TestAttempts[]
+  testAssignments TestAssignments[]
+  bookmarks       Bookmarks[]
+
+  @@map("tests")
+}
+
+model TestAssignments {
+  id                       String    @id @default(uuid()) @db.VarChar(36)
+  test_id                  String    @db.VarChar(36)
+  audience_type            String
+  batch_id                 String?
+  status                   String?   @default("ACTIVE")
+  schedule                 Json?     @default("{}")
+  allow_reattempts         Boolean?  @default(true)
+  leaderboard_enabled      Boolean?  @default(true)
+  solutions_release_policy Json?     @default("{}")
+  sort_order               Int?      @default(0)
+  created_by               String?   @db.VarChar(36)
+  created_at               DateTime? @default(now()) @db.DateTime(6)
+  updated_at               DateTime? @default(now()) @db.DateTime(6)
+
+  test         Tests          @relation(fields: [test_id], references: [id])
   batch        Batches?       @relation(fields: [batch_id], references: [id])
   user         User?          @relation(fields: [created_by], references: [id])
   testAttempts TestAttempts[]
-  bookmarks    Bookmarks[]
 
-  @@map("tests")
+  @@map("test_assignments")
 }
 
 model TestAttempts {
   id             String    @id @default(uuid()) @db.VarChar(36)
   test_id        String    @db.VarChar(36)
+  test_assignment_id String? @db.VarChar(36)
   student_id     String    @db.VarChar(36)
   student_name   String?
-  score          Int?      @default(0)
-  max_score      Int?      @default(0)
-  accuracy       Decimal?  @default(0) @db.Decimal
+  score          Decimal?  @default(0) @db.Decimal(10, 2)
+  max_score      Decimal?  @default(0) @db.Decimal(10, 2)
+  accuracy       Decimal?  @default(0) @db.Decimal(5, 2)
   time_taken     Int?      @default(0)
   answers        Json?     @default("{}")
   status         Json?     @default("{}")
@@ -219,8 +269,9 @@ model TestAttempts {
   subject_scores Json?     @default("{}")
   is_submitted   Boolean?  @default(true)
 
-  test Tests @relation(fields: [test_id], references: [id])
-  user User? @relation(fields: [student_id], references: [id])
+  test           Tests            @relation(fields: [test_id], references: [id])
+  testAssignment TestAssignments? @relation(fields: [test_assignment_id], references: [id])
+  user           User?            @relation(fields: [student_id], references: [id])
 
   @@map("test_attempts")
 }
@@ -263,23 +314,114 @@ model Announcements {
 // NEW DOMAIN MODELS (Synchronized from Supabase Schema)
 // -----------------------------------------------------
 
-model Blogs {
-  id            String    @id @default(uuid()) @db.VarChar(36)
-  slug          String    @unique
-  title         String
-  excerpt       String?   @db.Text
-  cover_image   String?   @db.Text
-  category      String
-  author_name   String
-  author_avatar String?   @db.Text
-  published_at  DateTime? @default(dbgenerated("(curdate())")) @db.Date
-  read_time     String?
-  sections      Json?     @default("[]")
-  tags          Json?     @default("[]")
-  created_at    DateTime? @default(now()) @db.DateTime(6)
-  updated_at    DateTime? @default(now()) @db.DateTime(6)
+model BlogAuthor {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  name        String
+  role        String?   @db.VarChar(191)
+  bio         String?   @db.Text
+  avatar_url  String?   @db.Text
+  expertise   Json?     @default("[]")
+  social_links Json?    @default("{}")
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+  updated_at  DateTime? @default(now()) @db.DateTime(6)
 
-  @@map("blogs")
+  posts BlogPost[]
+
+  @@map("blog_authors")
+}
+
+model BlogTopic {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  slug        String    @unique
+  title       String
+  description String?   @db.Text
+  parent_id   String?   @db.VarChar(36)
+  exam        String?   @db.VarChar(64)
+  subject     String?   @db.VarChar(128)
+  chapter     String?   @db.VarChar(191)
+  sort_order  Int?      @default(0)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+  updated_at  DateTime? @default(now()) @db.DateTime(6)
+
+  parent   BlogTopic?  @relation("BlogTopicTree", fields: [parent_id], references: [id])
+  children BlogTopic[] @relation("BlogTopicTree")
+
+  @@index([parent_id])
+  @@map("blog_topics")
+}
+
+model BlogPost {
+  id                 String    @id @default(uuid()) @db.VarChar(36)
+  slug               String    @unique
+  title              String
+  excerpt            String?   @db.Text
+  status             String    @default("DRAFT") @db.VarChar(32)
+  cover_image        String?   @db.Text
+  cover_image_alt    String?   @db.Text
+  category           String?   @db.VarChar(128)
+  exams              Json?     @default("[]")
+  class_levels       Json?     @default("[]")
+  subjects           Json?     @default("[]")
+  chapter            String?   @db.VarChar(191)
+  author_id          String?   @db.VarChar(36)
+  topic_ids          Json?     @default("[]")
+  read_time          String?   @db.VarChar(64)
+  seo_title          String?   @db.VarChar(191)
+  meta_description   String?   @db.Text
+  focus_keyword      String?   @db.VarChar(191)
+  secondary_keywords Json?     @default("[]")
+  tags               Json?     @default("[]")
+  canonical_url      String?   @db.Text
+  noindex            Boolean   @default(false)
+  og_title           String?   @db.VarChar(191)
+  og_description     String?   @db.Text
+  og_image           String?   @db.Text
+  content_blocks     Json?     @default("[]")
+  published_at       DateTime? @db.DateTime(6)
+  scheduled_at       DateTime? @db.DateTime(6)
+  archived_at        DateTime? @db.DateTime(6)
+  created_at         DateTime? @default(now()) @db.DateTime(6)
+  updated_at         DateTime? @default(now()) @db.DateTime(6)
+
+  author    BlogAuthor?    @relation(fields: [author_id], references: [id])
+  revisions BlogRevision[]
+  assets    BlogAsset[]
+
+  @@index([status, published_at])
+  @@index([author_id])
+  @@index([focus_keyword])
+  @@index([updated_at])
+  @@map("blog_posts")
+}
+
+model BlogRevision {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  post_id     String    @db.VarChar(36)
+  snapshot    Json
+  created_by  String?   @db.VarChar(36)
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@index([post_id, created_at])
+  @@map("blog_revisions")
+}
+
+model BlogAsset {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  post_id     String?   @db.VarChar(36)
+  url         String    @db.Text
+  alt_text    String?   @db.Text
+  caption     String?   @db.Text
+  mime_type   String?   @db.VarChar(128)
+  size_bytes  BigInt?
+  metadata    Json?     @default("{}")
+  created_at  DateTime? @default(now()) @db.DateTime(6)
+
+  post BlogPost? @relation(fields: [post_id], references: [id], onDelete: SetNull)
+
+  @@index([post_id])
+  @@map("blog_assets")
 }
 
 model Results {
@@ -354,4 +496,44 @@ model BookmarkTagRelations {
 
   @@id([bookmark_id, tag_id])
   @@map("bookmark_tag_relations")
+}
+
+model Quizzes {
+  id               String    @id @default(uuid()) @db.VarChar(36)
+  user_id          String    @db.VarChar(36)
+  stream           String
+  subject          String
+  num_questions    Int
+  duration_minutes Int
+  title            String
+  questions        Json?     @default("[]")
+  answer_key       Json?     @default("[]")
+  config           Json?     @default("{}")
+  status           String    @default("generating")
+  created_at       DateTime? @default(now()) @db.DateTime(6)
+
+  user         User           @relation(fields: [user_id], references: [id])
+  quizAttempts QuizAttempts[]
+
+  @@map("quizzes")
+}
+
+model QuizAttempts {
+  id         String    @id @default(uuid()) @db.VarChar(36)
+  quiz_id    String    @db.VarChar(36)
+  user_id    String    @db.VarChar(36)
+  score      Decimal?  @default(0) @db.Decimal(10, 2)
+  max_score  Decimal?  @default(0) @db.Decimal(10, 2)
+  accuracy   Decimal?  @default(0) @db.Decimal(5, 2)
+  time_taken Int?      @default(0)
+  answers    Json?     @default("{}")
+  status     Json?     @default("{}")
+  time_spent Json?     @default("{}")
+  result     Json?     @default("{}")
+  created_at DateTime? @default(now()) @db.DateTime(6)
+
+  quiz Quizzes @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("quiz_attempts")
 }

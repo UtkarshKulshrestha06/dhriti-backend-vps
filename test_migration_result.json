@@ -1,0 +1,1686 @@
+{
+  "id": "1c48d2eb-a031-41f4-a1ff-3edfb40a62eb",
+  "batch_id": null,
+  "name": "JM DFST 01",
+  "config": {
+    "sections": [],
+    "durationMinutes": 180,
+    "legacyMeta": {
+      "migrated": true,
+      "originalSections": [
+        {
+          "id": "Physics-Single Option-1771607172695",
+          "name": "Single Option",
+          "subject": "Physics",
+          "questionIndices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        },
+        {
+          "id": "Physics-Numerical-1771607172695",
+          "name": "Numerical",
+          "subject": "Physics",
+          "questionIndices": [
+            20,
+            21,
+            22,
+            23,
+            24
+          ]
+        },
+        {
+          "id": "Mathematics-Single Option-1771607172695",
+          "name": "Single Option",
+          "subject": "Mathematics",
+          "questionIndices": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "id": "Mathematics-Section 2-1771607172695",
+          "name": "Section 2",
+          "subject": "Mathematics",
+          "questionIndices": [
+            45,
+            46,
+            47,
+            48,
+            49
+          ]
+        },
+        {
+          "id": "Chemistry-Single Option-1771607172695",
+          "name": "Single Option",
+          "subject": "Chemistry",
+          "questionIndices": [
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69
+          ]
+        },
+        {
+          "id": "Chemistry-Numerical-1771607172695",
+          "name": "Numerical",
+          "subject": "Chemistry",
+          "questionIndices": [
+            70,
+            71,
+            72,
+            73,
+            74
+          ]
+        }
+      ]
+    }
+  },
+  "schedule": {
+    "endTime": 1771687800000,
+    "startTime": 1771561823449
+  },
+  "questions": {
+    "Physics": {
+      "Section A": {
+        "1": {
+          "secQueId": 1,
+          "queId": 1,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "2": {
+          "secQueId": 2,
+          "queId": 2,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "3": {
+          "secQueId": 3,
+          "queId": 3,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "4": {
+          "secQueId": 4,
+          "queId": 4,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "5": {
+          "secQueId": 5,
+          "queId": 5,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "6": {
+          "secQueId": 6,
+          "queId": 6,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "7": {
+          "secQueId": 7,
+          "queId": 7,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "8": {
+          "secQueId": 8,
+          "queId": 8,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "9": {
+          "secQueId": 9,
+          "queId": 9,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "10": {
+          "secQueId": 10,
+          "queId": 10,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED",
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "11": {
+          "secQueId": 11,
+          "queId": 11,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "12": {
+          "secQueId": 12,
+          "queId": 12,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "13": {
+          "secQueId": 13,
+          "queId": 13,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "14": {
+          "secQueId": 14,
+          "queId": 14,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "15": {
+          "secQueId": 15,
+          "queId": 15,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "16": {
+          "secQueId": 16,
+          "queId": 16,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "17": {
+          "secQueId": 17,
+          "queId": 17,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "18": {
+          "secQueId": 18,
+          "queId": 18,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "19": {
+          "secQueId": 19,
+          "queId": 19,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "20": {
+          "secQueId": 20,
+          "queId": 20,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED",
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      },
+      "Section B": {
+        "21": {
+          "secQueId": 1,
+          "queId": 21,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "22": {
+          "secQueId": 2,
+          "queId": 22,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "23": {
+          "secQueId": 3,
+          "queId": 23,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "24": {
+          "secQueId": 4,
+          "queId": 24,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "25": {
+          "secQueId": 5,
+          "queId": 25,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      }
+    },
+    "Mathematics": {
+      "Section A": {
+        "26": {
+          "secQueId": 1,
+          "queId": 26,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "27": {
+          "secQueId": 2,
+          "queId": 27,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "28": {
+          "secQueId": 3,
+          "queId": 28,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "29": {
+          "secQueId": 4,
+          "queId": 29,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "30": {
+          "secQueId": 5,
+          "queId": 30,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "31": {
+          "secQueId": 6,
+          "queId": 31,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "32": {
+          "secQueId": 7,
+          "queId": 32,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "33": {
+          "secQueId": 8,
+          "queId": 33,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "34": {
+          "secQueId": 9,
+          "queId": 34,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "35": {
+          "secQueId": 10,
+          "queId": 35,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "36": {
+          "secQueId": 11,
+          "queId": 36,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "37": {
+          "secQueId": 12,
+          "queId": 37,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "38": {
+          "secQueId": 13,
+          "queId": 38,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "39": {
+          "secQueId": 14,
+          "queId": 39,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "40": {
+          "secQueId": 15,
+          "queId": 40,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "41": {
+          "secQueId": 16,
+          "queId": 41,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "42": {
+          "secQueId": 17,
+          "queId": 42,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "43": {
+          "secQueId": 18,
+          "queId": 43,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "44": {
+          "secQueId": 19,
+          "queId": 44,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "45": {
+          "secQueId": 20,
+          "queId": 45,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      },
+      "Section B": {
+        "46": {
+          "secQueId": 1,
+          "queId": 46,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "47": {
+          "secQueId": 2,
+          "queId": 47,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "48": {
+          "secQueId": 3,
+          "queId": 48,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "49": {
+          "secQueId": 4,
+          "queId": 49,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "50": {
+          "secQueId": 5,
+          "queId": 50,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      }
+    },
+    "Chemistry": {
+      "Section A": {
+        "51": {
+          "secQueId": 1,
+          "queId": 51,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "52": {
+          "secQueId": 2,
+          "queId": 52,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "53": {
+          "secQueId": 3,
+          "queId": 53,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "54": {
+          "secQueId": 4,
+          "queId": 54,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "55": {
+          "secQueId": 5,
+          "queId": 55,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "56": {
+          "secQueId": 6,
+          "queId": 56,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "57": {
+          "secQueId": 7,
+          "queId": 57,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "58": {
+          "secQueId": 8,
+          "queId": 58,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "59": {
+          "secQueId": 9,
+          "queId": 59,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "60": {
+          "secQueId": 10,
+          "queId": 60,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "61": {
+          "secQueId": 11,
+          "queId": 61,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "62": {
+          "secQueId": 12,
+          "queId": 62,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "63": {
+          "secQueId": 13,
+          "queId": 63,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "64": {
+          "secQueId": 14,
+          "queId": 64,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "65": {
+          "secQueId": 15,
+          "queId": 65,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "66": {
+          "secQueId": 16,
+          "queId": 66,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "67": {
+          "secQueId": 17,
+          "queId": 67,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "68": {
+          "secQueId": 18,
+          "queId": 68,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "69": {
+          "secQueId": 19,
+          "queId": 69,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "70": {
+          "secQueId": 20,
+          "queId": 70,
+          "type": "mcq",
+          "answerOptions": "4",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      },
+      "Section B": {
+        "71": {
+          "secQueId": 1,
+          "queId": 71,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "72": {
+          "secQueId": 2,
+          "queId": 72,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "73": {
+          "secQueId": 3,
+          "queId": 73,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "74": {
+          "secQueId": 4,
+          "queId": 74,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        },
+        "75": {
+          "secQueId": 5,
+          "queId": 75,
+          "type": "nat",
+          "answerOptions": "",
+          "marks": {
+            "cm": 4,
+            "im": -1,
+            "max": 4
+          },
+          "imageUrls": [
+            "BASE64_IMAGE_REMOVED"
+          ],
+          "pdfData": {}
+        }
+      }
+    }
+  },
+  "duration_minutes": 180,
+  "created_by": "e232d949-9fc1-4a8b-aa47-7ad9e46907c1",
+  "created_at": {},
+  "tags": [],
+  "answer_key": {
+    "Physics": {
+      "Section A": {
+        "1": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "2": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "3": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "4": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "5": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "6": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "7": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "8": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "9": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "10": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "11": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "12": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "13": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "14": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "15": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "16": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "17": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "18": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "19": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "20": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        }
+      },
+      "Section B": {
+        "21": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "1260"
+        },
+        "22": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "2"
+        },
+        "23": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "160"
+        },
+        "24": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "16"
+        },
+        "25": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "144"
+        }
+      }
+    },
+    "Mathematics": {
+      "Section A": {
+        "26": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "27": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "28": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "29": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "30": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "31": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "32": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "33": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "34": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "35": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "36": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "37": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "38": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "39": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "40": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "41": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "42": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "43": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "44": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "45": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        }
+      },
+      "Section B": {
+        "46": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "27"
+        },
+        "47": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "0"
+        },
+        "48": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "7"
+        },
+        "49": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "8"
+        },
+        "50": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "49"
+        }
+      }
+    },
+    "Chemistry": {
+      "Section A": {
+        "51": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "52": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "53": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "54": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "55": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "56": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "57": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 3
+        },
+        "58": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "59": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "60": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "61": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "62": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "63": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "64": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "65": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "66": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        },
+        "67": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 4
+        },
+        "68": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "69": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 2
+        },
+        "70": {
+          "type": "mcq",
+          "answerOptions": "4",
+          "correctAnswer": 1
+        }
+      },
+      "Section B": {
+        "71": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "11"
+        },
+        "72": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "7"
+        },
+        "73": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "6"
+        },
+        "74": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "9"
+        },
+        "75": {
+          "type": "nat",
+          "answerOptions": "",
+          "correctAnswer": "180"
+        }
+      }
+    }
+  },
+  "is_free": true,
+  "test_type": "FULL_SYLLABUS",
+  "status": "PUBLISHED",
+  "updated_at": {},
+  "question_count": 75
+}

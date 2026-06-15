@@ -1,10 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../services/prisma');
 const { requireAuth, getJwtSecret, extractBearerToken, verifyToken } = require('../middleware/auth');
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '7d';
 
@@ -192,7 +191,7 @@ router.post('/auth/refresh', async (req, res) => {
       return res.status(401).json({ error: 'Missing token' });
     }
 
-    const decoded = verifyToken(token, { ignoreExpiration: true });
+    const decoded = verifyToken(token); // Removed ignoreExpiration: true for security
     const user = await prisma.user.findUnique({
       where: { id: decoded.id }
     });

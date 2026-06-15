@@ -2,13 +2,12 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const multer = require("multer");
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../services/prisma");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { cache, CACHE_TTL } = require("../services/cache");
 
 const { uploadFile } = require("../services/ftpService");
 
-const prisma = new PrismaClient();
 
 // Multer Memory Storage
 const storage = multer.memoryStorage();

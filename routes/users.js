@@ -1,10 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../services/prisma');
 const { requireAuth, requireAdmin, requireTeacher } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -218,10 +217,42 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Cascade delete enrollments first (in case FK constraints aren't set up)
-    await prisma.enrollments.deleteMany({ where: { user_id: id } });
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete BookmarkTagRelations associated with user's tags or bookmarks
+      // Since it's a many-to-many, we first find the user's bookmarks and tags
+      const userBookmarks = await tx.bookmarks.findMany({ where: { user_id: id }, select: { id: true } });
+      const userTags = await tx.questionTags.findMany({ where: { user_id: id }, select: { id: true } });
+      
+      const bookmarkIds = userBookmarks.map(b => b.id);
+      const tagIds = userTags.map(t => t.id);
 
-    await prisma.user.delete({ where: { id } });
+      if (bookmarkIds.length > 0 || tagIds.length > 0) {
+        await tx.bookmarkTagRelations.deleteMany({
+          where: {
+            OR: [
+              { bookmark_id: { in: bookmarkIds } },
+              { tag_id: { in: tagIds } }
+            ]
+          }
+        });
+      }
+
+      // 2. Cascade delete other relations
+      await tx.bookmarks.deleteMany({ where: { user_id: id } });
+      await tx.questionTags.deleteMany({ where: { user_id: id } });
+      await tx.notebooks.deleteMany({ where: { user_id: id } });
+      await tx.testAttempts.deleteMany({ where: { student_id: id } });
+      
+      // For Tests and Announcements, they might be owned by teachers/admins
+      await tx.tests.updateMany({ where: { created_by: id }, data: { created_by: null } });
+      await tx.announcements.deleteMany({ where: { author_id: id } });
+      await tx.resources.deleteMany({ where: { uploaded_by: id } });
+      await tx.siteContent.updateMany({ where: { updated_by: id }, data: { updated_by: null } });
+      
+      // Finally delete enrollments and the user
+      await tx.enrollments.deleteMany({ where: { user_id: id } });
+      await tx.user.delete({ where: { id } });
+    });
 
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (err) {

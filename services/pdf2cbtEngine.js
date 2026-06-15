@@ -190,8 +190,10 @@ function getAttemptValue(data, subject, section, question, questionData) {
 
     const queId = questionData.queId ?? questionData.secQueId ?? question;
     return firstDefinedValue(data, [
+        `${subject}::${section}::${question}`,
         `${subject}.${section}.${question}`,
         `${subject}|${section}|${question}`,
+        `${section}::${question}`,
         `${section}.${question}`,
         `${section}|${question}`,
         `${queId}`,

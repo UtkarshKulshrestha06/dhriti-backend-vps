@@ -166,6 +166,14 @@ function normalizeDateTime(value) {
     .slice(0, 26);
 }
 
+function normalizeTextValue(value) {
+  if (value === null || value === undefined) return value;
+  return String(value)
+    .replace(/Γé╣|â‚¹|₹/g, "₹")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isMapped(map, table, column) {
   return map.get(table)?.has(column) || false;
 }
@@ -189,7 +197,7 @@ function convertValue(table, column, value) {
     return normalizeDateTime(value);
   }
 
-  return value;
+  return normalizeTextValue(value);
 }
 
 async function parseDump(dumpPath) {

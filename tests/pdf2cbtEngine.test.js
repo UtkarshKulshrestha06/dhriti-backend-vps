@@ -133,8 +133,34 @@ test("calculates aggregate score, accuracy, subject scores, and question results
             102: [1, 3],
             201: "1.3",
         },
+});
+
+test("matches frontend double-colon attempt keys", () => {
+    const testData = {
+        Physics: {
+            "Section A": {
+                1: { queId: 1, type: "mcq", marks: { cm: 4, im: -1, max: 4 }, pdfData: {} },
+            },
+        },
+    };
+    const answerKey = {
+        Physics: {
+            "Section A": {
+                1: { type: "mcq", correctAnswer: 1 },
+            },
+        },
+    };
+    const result = calculatePdf2CbtScore({
+        testData,
+        answerKey,
+        answers: { "Physics::Section A::1": 1 },
+        status: { "Physics::Section A::1": "answered" },
     });
 
+    assert.equal(result.score, 4);
+    assert.equal(result.correct, 1);
+    assert.equal(result.unanswered, 0);
+});
     assert.equal(result.score, 10);
     assert.equal(result.maxScore, 12);
     assert.equal(result.accuracy, 89);
