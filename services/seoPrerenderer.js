@@ -4,7 +4,7 @@ const prisma = require("./prisma");
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)).catch(() => global.fetch(...args));
 
 const SITE_URL = process.env.PUBLIC_SITE_URL || "https://dhriticlasses.com";
-const FTP_BASE_PATH = process.env.FTP_BASE_PATH || "public_html";
+const FTP_ROOT_PATH = (process.env.FTP_BASE_PATH || "public_html").replace(/\/uploads\/?$/, "");
 
 const escapeHtml = (value = "") =>
   String(value)
@@ -180,7 +180,7 @@ async function prerenderAndUploadBlog(post) {
     });
 
     const finalHtml = injectHtml(template, tags, renderPostBody(post));
-    const remotePath = `${FTP_BASE_PATH}/blogs/${post.slug}/index.html`;
+    const remotePath = `${FTP_ROOT_PATH}/blogs/${post.slug}/index.html`;
 
     console.log(`[SEO Prerender] Uploading blog HTML for ${post.slug}...`);
     await uploadFile(Buffer.from(finalHtml, "utf8"), remotePath);
@@ -216,7 +216,7 @@ async function prerenderAndUploadBlogListing() {
     });
 
     const finalHtml = injectHtml(template, tags, renderListingBody(posts));
-    const remotePath = `${FTP_BASE_PATH}/blogs/index.html`;
+    const remotePath = `${FTP_ROOT_PATH}/blogs/index.html`;
 
     console.log(`[SEO Prerender] Uploading blog listing HTML...`);
     await uploadFile(Buffer.from(finalHtml, "utf8"), remotePath);
@@ -227,7 +227,7 @@ async function prerenderAndUploadBlogListing() {
 
 async function deletePrerenderedBlog(slug) {
   try {
-    const remotePath = `${FTP_BASE_PATH}/blogs/${slug}/index.html`;
+    const remotePath = `${FTP_ROOT_PATH}/blogs/${slug}/index.html`;
     await deleteFile(remotePath);
     console.log(`[SEO Prerender] Deleted HTML for archived blog: ${slug}`);
   } catch (err) {
@@ -265,7 +265,7 @@ async function prerenderAndUploadBlogSitemap() {
 
     xml += "</urlset>";
 
-    const remotePath = `${FTP_BASE_PATH}/sitemap-blogs.xml`;
+    const remotePath = `${FTP_ROOT_PATH}/sitemap-blogs.xml`;
     console.log(`[SEO Prerender] Uploading sitemap-blogs.xml...`);
     await uploadFile(Buffer.from(xml, "utf8"), remotePath);
   } catch (err) {
