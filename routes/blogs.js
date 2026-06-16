@@ -8,7 +8,7 @@ const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { uploadFile } = require("../services/ftpService");
 const { cache, CACHE_TTL } = require("../services/cache");
 const { formatDateString } = require("../services/dateTime");
-const { prerenderAndUploadBlog, prerenderAndUploadBlogListing, deletePrerenderedBlog } = require("../services/seoPrerenderer");
+const { prerenderAndUploadBlog, prerenderAndUploadBlogListing, deletePrerenderedBlog, prerenderAndUploadBlogSitemap } = require("../services/seoPrerenderer");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -614,6 +614,7 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
       pingIndexNow([`${SITE_URL}/blogs/${post.slug}`, `${SITE_URL}/blogs`]).catch(() => {});
       prerenderAndUploadBlog(serializePost(post)).catch(() => {});
       prerenderAndUploadBlogListing().catch(() => {});
+      prerenderAndUploadBlogSitemap().catch(() => {});
     }
 
     res.status(201).json(serializePost(post));
@@ -641,6 +642,7 @@ router.post("/:id/autosave", requireAuth, requireAdmin, async (req, res) => {
     if (updated.status === STATUS.PUBLISHED) {
       prerenderAndUploadBlog(serializePost(updated)).catch(() => {});
       prerenderAndUploadBlogListing().catch(() => {});
+      prerenderAndUploadBlogSitemap().catch(() => {});
     }
     
     res.json(serializePost(updated));
@@ -713,9 +715,11 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
       pingIndexNow([`${SITE_URL}/blogs/${updated.slug}`, `${SITE_URL}/blogs`]).catch(() => {});
       prerenderAndUploadBlog(serializePost(updated)).catch(() => {});
       prerenderAndUploadBlogListing().catch(() => {});
+      prerenderAndUploadBlogSitemap().catch(() => {});
     } else if (existingPost.status === STATUS.PUBLISHED && updated.status !== STATUS.PUBLISHED) {
       deletePrerenderedBlog(updated.slug).catch(() => {});
       prerenderAndUploadBlogListing().catch(() => {});
+      prerenderAndUploadBlogSitemap().catch(() => {});
     }
 
     res.json(serializePost(updated));
@@ -734,6 +738,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
     cache.invalidatePattern("blogs:");
     deletePrerenderedBlog(updated.slug).catch(() => {});
     prerenderAndUploadBlogListing().catch(() => {});
+    prerenderAndUploadBlogSitemap().catch(() => {});
     res.json({ message: "Blog archived successfully" });
   } catch (err) {
     console.error("Error archiving blog:", err);

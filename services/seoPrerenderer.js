@@ -235,8 +235,47 @@ async function deletePrerenderedBlog(slug) {
   }
 }
 
+const { formatDateString } = require("./dateTime");
+
+async function prerenderAndUploadBlogSitemap() {
+  try {
+    const [posts, topics] = await Promise.all([
+      prisma.blogPost.findMany({
+        where: { status: "PUBLISHED", noindex: false, OR: [{ published_at: null }, { published_at: { lte: new Date() } }] },
+        select: { slug: true, updated_at: true },
+        orderBy: [{ published_at: "desc" }],
+      }),
+      prisma.blogTopic.findMany({
+        select: { slug: true, updated_at: true },
+        orderBy: [{ sort_order: "asc" }],
+      }),
+    ]);
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    xml += `  <url>\n    <loc>${SITE_URL}/blogs</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
+
+    topics.forEach((topic) => {
+      xml += `  <url>\n    <loc>${SITE_URL}/blogs/topic/${topic.slug}</loc>\n    <lastmod>${formatDateString(topic.updated_at || new Date())}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.75</priority>\n  </url>\n`;
+    });
+
+    posts.forEach((post) => {
+      xml += `  <url>\n    <loc>${SITE_URL}/blogs/${post.slug}</loc>\n    <lastmod>${formatDateString(post.updated_at || new Date())}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+    });
+
+    xml += "</urlset>";
+
+    const remotePath = `${FTP_BASE_PATH}/sitemap-blogs.xml`;
+    console.log(`[SEO Prerender] Uploading sitemap-blogs.xml...`);
+    await uploadFile(Buffer.from(xml, "utf8"), remotePath);
+  } catch (err) {
+    console.error("[SEO Prerender] Failed to upload blog sitemap:", err.message);
+  }
+}
+
 module.exports = {
   prerenderAndUploadBlog,
   prerenderAndUploadBlogListing,
   deletePrerenderedBlog,
+  prerenderAndUploadBlogSitemap,
 };
