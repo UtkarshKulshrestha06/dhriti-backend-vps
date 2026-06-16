@@ -8,6 +8,7 @@ const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { uploadFile } = require("../services/ftpService");
 const { cache, CACHE_TTL } = require("../services/cache");
 const { formatDateString } = require("../services/dateTime");
+const { prerenderAndUploadBlog, prerenderAndUploadBlogListing, deletePrerenderedBlog } = require("../services/seoPrerenderer");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -611,6 +612,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
     // Auto-notify search engines when a new blog is published
     if (post.status === STATUS.PUBLISHED) {
       pingIndexNow([`${SITE_URL}/blogs/${post.slug}`, `${SITE_URL}/blogs`]).catch(() => {});
+      prerenderAndUploadBlog(serializePost(post)).catch(() => {});
+      prerenderAndUploadBlogListing().catch(() => {});
     }
 
     res.status(201).json(serializePost(post));
@@ -634,6 +637,12 @@ router.post("/:id/autosave", requireAuth, requireAdmin, async (req, res) => {
 
     await createSnapshot(updated.id, serializePost(updated), req.user?.id);
     cache.invalidatePattern("blogs:");
+    
+    if (updated.status === STATUS.PUBLISHED) {
+      prerenderAndUploadBlog(serializePost(updated)).catch(() => {});
+      prerenderAndUploadBlogListing().catch(() => {});
+    }
+    
     res.json(serializePost(updated));
   } catch (err) {
     console.error("Error autosaving blog:", err);
@@ -702,6 +711,11 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
     // Auto-notify search engines when a blog is published/updated
     if (updated.status === STATUS.PUBLISHED) {
       pingIndexNow([`${SITE_URL}/blogs/${updated.slug}`, `${SITE_URL}/blogs`]).catch(() => {});
+      prerenderAndUploadBlog(serializePost(updated)).catch(() => {});
+      prerenderAndUploadBlogListing().catch(() => {});
+    } else if (existingPost.status === STATUS.PUBLISHED && updated.status !== STATUS.PUBLISHED) {
+      deletePrerenderedBlog(updated.slug).catch(() => {});
+      prerenderAndUploadBlogListing().catch(() => {});
     }
 
     res.json(serializePost(updated));
@@ -713,11 +727,13 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
 
 router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
-    await prisma.blogPost.update({
+    const updated = await prisma.blogPost.update({
       where: { id: req.params.id },
       data: { status: STATUS.ARCHIVED, archived_at: new Date(), updated_at: new Date() },
     });
     cache.invalidatePattern("blogs:");
+    deletePrerenderedBlog(updated.slug).catch(() => {});
+    prerenderAndUploadBlogListing().catch(() => {});
     res.json({ message: "Blog archived successfully" });
   } catch (err) {
     console.error("Error archiving blog:", err);
